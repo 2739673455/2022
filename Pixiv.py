@@ -47,7 +47,7 @@ def get_url(headers):
     thumbnail=re.findall('"data-filter="thumbnail-filter lazy-image"data-src="(.*?)"data-type="illust"data-id="',resp.text,re.S)
     return thumbnail
 
-# 下载缩略图并显示
+# 下载缩略图
 files=[]
 dict_file={}
 def thumbnail_download(n1,n2):
@@ -66,6 +66,7 @@ def thumbnail_download(n1,n2):
                 f.write(thumbnail_1.content)
             print(f'{thumbnail_name}下载完成')
 
+# 将缩略图以按钮添加到界面
 def show_thumbnail():
     for i,file in enumerate(files):
         img_open=Image.open(file)
@@ -83,9 +84,10 @@ text=Text(win,yscrollcommand = scroll.set,width=100,height=50)
 thumbnail=get_url(headers)
 img_list=[0]*len(thumbnail)
 
+# 开启多线程
 download_threads=[]
 for i in range(0,len(thumbnail),len(thumbnail)//10):
-    download_thread=Thread(target=thumbnail_download,args=(i,i+5))
+    download_thread=Thread(target=thumbnail_download,args=(i,i+len(thumbnail)//10))
     download_threads.append(download_thread)
     download_thread.start()
 
