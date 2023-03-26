@@ -31,6 +31,29 @@ class Thumbnail_Download_Thread(QThread): #下载预览图线程
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             [executor.submit(self.thumbnail_download, url) for url in self.thumbnail_list]
 
+class Image_Download_Thread(QThread): #下载高清图线程
+    def __init__(self,img_id):
+        super().__init__()
+        self.img_id = img_id
+
+    def run(self):
+        url= f'https://www.pixiv.net/artworks/{self.img_id}'
+        path2='D:/top50/'
+        if os.path.isdir(path2)==False:
+            os.mkdir(path2)
+        file2 = path2+self.img_id+'.jpg'
+        if os.path.isfile(file2)==True:
+            print(f'{self.img_id}已存在')
+        else:
+            headers['referer']=url
+            resp1=requests.get(url,headers=headers,verify=False,proxies=proxies)
+            resp2=re.search('"original":"(.+?)"',resp1.text)
+            resp2=resp2.group(1)
+            s = requests.get(resp2,headers=headers,verify=False,proxies=proxies)
+            with open(file2,'wb') as f:
+                f.write(s.content)
+            print(f'{self.img_id}下载完成')
+            s.close()
 
 class Pixiv(QDialog):
     def __init__(self):
@@ -69,32 +92,16 @@ class Pixiv(QDialog):
         self.thumbnail_download_thread.thumbnail_name_sign.connect(self.addimgbutton)
         self.thumbnail_download_thread.start()
 
-    def img_download(self,img_id):
-        url= f'https://www.pixiv.net/artworks/{img_id}'
-        path2='D:/top50/'
-        if os.path.isdir(path2)==False:
-            os.mkdir(path2)
-        file2 = path2+img_id+'.jpg'
-        if os.path.isfile(file2)==True:
-            print(f'{img_id}已存在')
-        else:
-            headers['referer']=url
-            resp1=requests.get(url,headers=headers,verify=False,proxies=proxies)
-            resp2=re.search('"original":"(.+?)"',resp1.text)
-            resp2=resp2.group(1)
-            s = requests.get(resp2,headers=headers,verify=False,proxies=proxies)
-            with open(file2,'wb') as f:
-                f.write(s.content)
-            print(f'{img_id}下载完成')
-            s.close()
-
     def get_url(self,headers): #获取排行榜前五十的作品缩略图的url,返回url列表
         url='https://www.pixiv.net/ranking.php?mode=daily_r18'
         headers['referer']=url
         resp=requests.get(url,headers=headers,verify=False,proxies=proxies)
         thumbnail_list=re.findall('"data-filter="thumbnail-filter lazy-image"data-src="(.*?)"data-type="illust"data-id="',resp.text,re.S)
         return thumbnail_list
-
+    
+    def img_download(self,img_id):
+        self.image_download_thread = Image_Download_Thread(img_id)
+        self.image_download_thread.start()
 
 if __name__ == "__main__":
     urllib3.disable_warnings()
