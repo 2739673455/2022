@@ -4,10 +4,10 @@ import re
 import sys
 import urllib3
 import requests
+import concurrent.futures
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-import concurrent.futures
 
 class Thumbnail_Download_Thread(QThread): #下载预览图线程
     thumbnail_name_sign = pyqtSignal(str)
@@ -37,7 +37,7 @@ class Pixiv(QDialog):
         super().__init__()
         self.img_dict = dict()
         self.thumbnail_list = self.get_url(headers)
-        self.imglist = os.listdir("D:/ztop50/")
+        self.imglist = os.listdir(path)
         self.i = 0
         self.initUI()
     
