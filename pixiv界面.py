@@ -10,42 +10,42 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
 class Thumbnail_Download_Thread(QThread): #下载预览图线程
-    thumbnail_name_sign = pyqtSignal(str)
+    id_sign = pyqtSignal(str)
     textsig = pyqtSignal(str)
-    def __init__(self,thumbnail_list):
+    def __init__(self,thumbnail_urls):
         super().__init__()
-        self.thumbnail_list = thumbnail_list
+        self.thumbnail_urls = thumbnail_urls
 
     def thumbnail_download(self,thumbnail_url):
-        thumbnail_name=thumbnail_url.split('/')[-1].split('_')[0] #获取图片id
-        file=path+thumbnail_name+'.jpg' #获取文件路径
+        id=thumbnail_url.split('/')[-1].split('_')[0] #获取图片id
+        file=path+id+'.jpg' #获取文件路径
         if os.path.isfile(file)==True:
-            self.textsig.emit(f'{thumbnail_name}已存在')
+            self.textsig.emit(f'{id}已存在')
         else:
             thumbnail_1=requests.get(thumbnail_url,headers=headers,proxies=proxies)
             with open(file,'wb') as f:
                 f.write(thumbnail_1.content)
-            self.textsig.emit(f'{thumbnail_name}已下载')
-            self.thumbnail_name_sign.emit(str(thumbnail_name))
+            self.textsig.emit(f'{id}已下载')
+            self.id_sign.emit(str(id))
 
     def run(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-            [executor.submit(self.thumbnail_download, url) for url in self.thumbnail_list]
+            [executor.submit(self.thumbnail_download, url) for url in self.thumbnail_urls]
 
 class Image_Download_Thread(QThread): #下载高清图线程
     textsig = pyqtSignal(str)
-    def __init__(self,img_id):
+    def __init__(self,id):
         super().__init__()
-        self.img_id = img_id
+        self.id = id
 
     def run(self):
-        url= f'https://www.pixiv.net/artworks/{self.img_id}'
-        path2='D:/top50/'
+        url= f'https://www.pixiv.net/artworks/{self.id}'
+        path2='D:/Pixiv_top50/img/'
         if os.path.isdir(path2)==False:
             os.mkdir(path2)
-        file2 = path2+self.img_id+'.jpg'
+        file2 = path2+self.id+'.jpg'
         if os.path.isfile(file2)==True:
-            self.textsig.emit(f'{self.img_id}已存在{path2}')
+            self.textsig.emit(f'{self.id}已存在{path2}')
         else:
             headers['referer']=url
             resp1=requests.get(url,headers=headers,verify=False,proxies=proxies)
@@ -54,15 +54,15 @@ class Image_Download_Thread(QThread): #下载高清图线程
             s = requests.get(resp2,headers=headers,verify=False,proxies=proxies)
             with open(file2,'wb') as f:
                 f.write(s.content)
-            self.textsig.emit(f'{self.img_id}下载至{path2}')
+            self.textsig.emit(f'{self.id}下载至{path2}')
             s.close()
 
 class Pixiv(QDialog):
     def __init__(self):
         super().__init__()
-        self.img_dict = dict()
-        self.thumbnail_list = self.get_url(headers)
-        self.imglist = os.listdir(path)
+        self.id_dict = dict()
+        self.thumbnail_urls = self.get_url(headers)
+        self.thumbnail_list = os.listdir(path)
         self.i = 0
         self.initUI()
     
@@ -83,36 +83,36 @@ class Pixiv(QDialog):
         self.layout1.addWidget(self.textbrowser1)
         self.setLayout(self.layout1)
 
-        for j in range(len(self.imglist)):
-            self.addimgbutton(self.imglist[j].split('.')[0])
+        for j in range(len(self.thumbnail_list)):
+            self.addimgbutton(self.thumbnail_list[j].split('.')[0])
 
         self.win.setLayout(self.grid)
         self.scrollarea.setWidget(self.win)
-        self.thumbnail_download_thread = Thumbnail_Download_Thread(self.thumbnail_list)
-        self.thumbnail_download_thread.thumbnail_name_sign.connect(self.addimgbutton)
+        self.thumbnail_download_thread = Thumbnail_Download_Thread(self.thumbnail_urls)
+        self.thumbnail_download_thread.id_sign.connect(self.addimgbutton)
         self.thumbnail_download_thread.textsig.connect(self.append_text)
         self.thumbnail_download_thread.start()
 
-    def addimgbutton(self,imgname): #添加按钮
-        img = path+imgname
+    def addimgbutton(self,id): #添加按钮
+        thumbnail = path+id
         self.button1 = QPushButton()
-        self.button1.setIcon(QIcon(img))
+        self.button1.setIcon(QIcon(thumbnail))
         self.button1.setIconSize(QSize(250,400))
-        self.img_dict[img] = imgname
-        self.button1.clicked.connect(lambda x=img:self.img_download(self.img_dict[img]))
+        self.id_dict[thumbnail] = id
+        self.button1.clicked.connect(lambda x=thumbnail:self.img_download(self.id_dict[thumbnail]))
         self.grid.addWidget(self.button1,self.i//5,self.i%5)
-        self.win.resize(1500,450*(self.i//5+1))
+        self.win.resize(1500,400*(self.i//5+1))
         self.i+=1
 
     def get_url(self,headers): #获取排行榜前五十的作品缩略图的url,返回url列表
         url='https://www.pixiv.net/ranking.php?mode=daily_r18'
         headers['referer']=url
         resp=requests.get(url,headers=headers,verify=False,proxies=proxies)
-        thumbnail_list=re.findall('"data-filter="thumbnail-filter lazy-image"data-src="(.*?)"data-type="illust"data-id="',resp.text,re.S)
-        return thumbnail_list
+        thumbnail_urls=re.findall('"data-filter="thumbnail-filter lazy-image"data-src="(.*?)"data-type="illust"data-id="',resp.text,re.S)
+        return thumbnail_urls
     
-    def img_download(self,img_id):
-        self.image_download_thread = Image_Download_Thread(img_id)
+    def img_download(self,id):
+        self.image_download_thread = Image_Download_Thread(id)
         self.image_download_thread.textsig.connect(self.append_text)
         self.image_download_thread.start()
 
@@ -121,9 +121,9 @@ class Pixiv(QDialog):
 
 if __name__ == "__main__":
     urllib3.disable_warnings()
-    path = "D:/ztop50/"
+    path = "D:/Pixiv_top50/thumbnail/"
     if os.path.isdir(path)==False:
-        os.mkdir(path)
+        os.makedirs(path)
     proxies={'https':'127.0.0.1:7890'}
     headers={
     'Connection':'close',
