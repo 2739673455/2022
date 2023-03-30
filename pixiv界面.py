@@ -73,6 +73,7 @@ class Pixiv(QDialog):
         self.layout1 = QVBoxLayout()
 
         self.scrollarea = QScrollArea(self)
+        self.scrollarea.setWidgetResizable(True)
         self.win = QWidget()
         self.grid = QGridLayout()
 
