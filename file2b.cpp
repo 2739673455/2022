@@ -23,20 +23,27 @@ void file2b(const string &file1)
 {
     int c;
 	stringstream file2;
-//    char file2[L_tmpnam] = {'\0'};
-//    tmpnam(file2);
 	vector<string> name_vector = stringSplit(file1);
 	file2<<name_vector[0]<<".dat";
+//    char file2[L_tmpnam] = {'\0'};
+//    tmpnam(file2);
 
     ifstream filein(file1, ios_base::in | ios_base::binary); 
-	ofstream fileout(file2.str(), ios_base::out | ios_base::binary);
-	filein.seekg(ios::beg);
+    ofstream fileout(file2.str(), ios_base::out);
+//    filein.seekg(4096);
+	int column = 0;
     while ((c=filein.get())!=EOF) 
     {
-		fileout<<c<<" ";
+		if (column > 15)
+		{
+			column = 0;
+			fileout<<endl;
+		}
+	    fileout<<c<<" ";
+		++column;
     }
     filein.close();
-	fileout.close();
+    fileout.close();
 }
 
 int main(int argc, char* argv[])
