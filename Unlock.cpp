@@ -3,7 +3,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <windows.h>
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -25,8 +24,7 @@ void copyFile(string source, string dest) {
 }
 
 void renameFile(string source, string dest, string currentDir) {
-    //string cmd = currentDir + "\\Unlock.exe ";
-    string cmd = "F:\\Unlock\\Unlock.exe ";
+    string cmd = "\"" + currentDir + "\\Unlock.exe\"";
     cmd += " -sourcePath=\"" + source + "\" -destPath=\"" + dest + "\"";
     system(cmd.c_str());
 }
