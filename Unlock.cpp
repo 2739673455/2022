@@ -27,6 +27,14 @@ void renameFile(string source, string dest, string currentDir) {
     string cmd = "\"" + currentDir + "\\Unlock.exe\"";
     cmd += " -sourcePath=\"" + source + "\" -destPath=\"" + dest + "\"";
     system(cmd.c_str());
+
+    //2
+    string cmd = "move \"" + source + "\" \"" + dest + "\"";
+    system(cmd.c_str());
+
+    //3
+    string cmd = "ren \"" + source + "\" \"" + dest + "\"";
+    system(cmd.c_str());
 }
 
 int main(int argc, char* argv[]) {
@@ -40,6 +48,10 @@ int main(int argc, char* argv[]) {
         string temp = file + ".temp";
         copyFile(file, temp);
         fs::remove(file);
+
+        //3
+        file = (fs::path(file)).filename().string();
+
         renameFile(temp, file, currentDir);
     }
     return 0;
