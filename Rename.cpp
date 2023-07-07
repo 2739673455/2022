@@ -1,17 +1,18 @@
-﻿#include<iostream>
 #include<string>
+#include<vector>
+#include<iostream>
 #include<filesystem>
 
 using namespace std;
-namespace fs = filesystem;
+namespace fs = std::filesystem;
 
-vector<string> getFiles(const string &self_name)
+vector<string> getFiles(const string& self_name)
 {
 	string current_dir = fs::current_path().string();
 	vector<string> files;
 	for (const auto& file_path : fs::recursive_directory_iterator(current_dir))
 	{
-		if (!(file_path.is_directory()) and file_path.path().string()!=self_name)
+		if (!(file_path.is_directory()) and file_path.path().string() != self_name)
 		{
 			files.push_back(file_path.path().string());
 		}
@@ -19,35 +20,38 @@ vector<string> getFiles(const string &self_name)
 	return files;
 }
 
-vector<string> reName(const vector<string>& files)
+void reName(const string & source_file, const string& dest_file)
 {
-	vector<string> temps;
 	int rename_resp;
-	for (string file : files)
-	{
-		string temp = file + ".temp";
-		temps.push_back(temp);
-		rename_resp = rename(file.c_str(), temp.c_str());
-	}
-	return temps;
+	rename_resp = rename(source_file.c_str(), dest_file.c_str());
 }
 
-void osMove(const vector<string>& files, const vector<string>& temps)
+void osMove(const string & source_file, const string & dest_file)
 {
-	for (int i=0; i<temps.size(); ++i)
-	{
-		string cmd = "move \"" + temps[i] + "\"" + " \"" + files[i] + "\" >nul";
-		//cout << cmd << endl;
-		system(cmd.c_str());
-	}
+	
+	string cmd = "move \"" + source_file + "\"" + " \"" + dest_file + "\" >nul";
+	system(cmd.c_str());
 }
 
+void backRename(const string & source_file)
+{
+	int pos;
+	pos = source_file.rfind(".");
+	string dest_file = source_file.substr(0,pos);
+	rename(source_file.c_str(), dest_file.c_str());
+}
 
-int main(int argc, char * argv[])
+int main(int argc, char* argv[])
 {
 	string self_name = fs::path(argv[0]).string();
 	vector<string> files = getFiles(self_name);
-	vector<string> temps = reName(files);
-	osMove(files, temps);
+	int rename_resp;
+	string cmd;
+	for (string file : files)
+	{
+		string temp = file + ".temp";
+		rename_resp = rename(file.c_str(), temp.c_str());
+		osMove(temp, file);
+	}
 	return 0;
 }
