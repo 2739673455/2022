@@ -1,58 +1,52 @@
-﻿#include <string>
-#include <vector>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
+#include<string>
+#include<vector>
+#include<fstream>
+#include<iostream>
+#include<filesystem>
 
 using namespace std;
 namespace fs = std::filesystem;
 
-vector<string> getAllFilesIncludeSubfolders(string path) {
-    vector<string> files;
-    for (const auto& entry : fs::recursive_directory_iterator(path)) {
-        if (!entry.is_directory()) {
-            files.push_back(entry.path().string());
-        }
-    }
-    return files;
+vector<string> getFiles(const string& self_name)
+{
+	string current_dir = fs::current_path().string();
+	vector<string> files;
+	for (const auto& file_path : fs::recursive_directory_iterator(current_dir))
+	{
+		if (!(file_path.is_directory()) and file_path.path().string() != self_name)
+		{
+			files.push_back(file_path.path().string());
+		}
+	}
+	return files;
 }
 
-void copyFile(string source, string dest) {
-    ifstream src(source, ios::binary);
-    ofstream dst(dest, ios::binary);
-    dst << src.rdbuf();
+void osMove(const string & source_file, const string & dest_file)
+{
+	
+	string cmd = "move \"" + source_file + "\"" + " \"" + dest_file + "\" >nul";
+	system(cmd.c_str());
 }
 
-void renameFile(string source, string dest, string currentDir) {
-    string cmd = "\"" + currentDir + "\\Unlock.exe\"";
-    cmd += " -sourcePath=\"" + source + "\" -destPath=\"" + dest + "\"";
-    system(cmd.c_str());
-
-    //2
-    string cmd = "move \"" + source + "\" \"" + dest + "\"";
-    system(cmd.c_str());
-
-    //3
-    string cmd = "ren \"" + source + "\" \"" + dest + "\"";
-    system(cmd.c_str());
+void backRename(const string & source_file)
+{
+	int pos;
+	pos = source_file.rfind(".");
+	string dest_file = source_file.substr(0,pos);
+	rename(source_file.c_str(), dest_file.c_str());
 }
 
-int main(int argc, char* argv[]) {
-    string currentDir = fs::current_path().string();
-    string selfName = (fs::path(argv[0])).filename().string();
-    vector files = getAllFilesIncludeSubfolders(currentDir);
-    for (string file : files) {
-        if (file.find(selfName) != string::npos || file.find("Unlock.exe") != string::npos) {
-           continue;
-        }
-        string temp = file + ".temp";
-        copyFile(file, temp);
-        fs::remove(file);
-
-        //3
-        file = (fs::path(file)).filename().string();
-
-        renameFile(temp, file, currentDir);
-    }
-    return 0;
+int main(int argc, char* argv[])
+{
+	string self_name = fs::path(argv[0]).string();
+	vector<string> files = getFiles(self_name);
+	int rename_resp;
+	string cmd;
+	for (string file : files)
+	{
+		string temp = file + ".temp";
+		rename_resp = rename(file.c_str(), temp.c_str());
+		osMove(temp, file);
+	}
+	return 0;
 }
