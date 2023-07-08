@@ -20,14 +20,6 @@ vector<string> getFiles(const string& self_name)
 	return files;
 }
 
-void backRename(const string& source_file)
-{
-	int pos;
-	pos = source_file.rfind(".");
-	string dest_file = source_file.substr(0, pos);
-	rename(source_file.c_str(), dest_file.c_str());
-}
-
 int main(int argc, char* argv[])
 {
 	string self_name = fs::path(argv[0]).string();
