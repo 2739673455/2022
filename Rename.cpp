@@ -12,7 +12,7 @@ vector<string> getFiles(const string& self_name)
 	vector<string> files;
 	for (const auto& file_path : fs::recursive_directory_iterator(current_dir))
 	{
-		if (!(file_path.is_directory()) and (file_path.path().string() != self_name) and (file_path.path().filename().string() != "Unlock.exe"))
+		if (!(file_path.is_directory()) and (file_path.path().string() != self_name) and (file_path.path().filename().string() != "ahh.exe"))
 		{
 			files.push_back(file_path.path().string());
 		}
@@ -24,13 +24,30 @@ int main(int argc, char* argv[])
 {
 	string self_name = fs::path(argv[0]).string();
 	vector<string> files = getFiles(self_name);
+	int feedback;
 	string cmd;
+	string temp_txt;
+	string temp_temp;
+
+
 	for (string file : files)
 	{
-		string temp = file + ".temp";
-		rename(file.c_str(), temp.c_str());
-		cmd = "Unlock.exe \"" + temp + "\"" + " \"" + file + "\"";
-		system(cmd.c_str());
+		temp_txt = file + ".txt";
+		feedback = rename(file.c_str(), temp_txt.c_str());
 	}
-	return 0;
+	system("pause");
+	for (string file : files)
+	{
+		temp_txt = file + ".txt";
+		temp_temp = file + ".temp";
+		feedback = rename(temp_txt.c_str(), temp_temp.c_str());
+		//cmd = "ahh.exe \"" + temp_temp + "\"" + " \"" + file + "\"";
+		//system(cmd.c_str());
+	}
+	system("pause");
+	for (string file : files)
+	{
+		temp_temp = file + ".temp";
+		feedback = rename(temp_temp.c_str(), file.c_str());
+	}
 }
