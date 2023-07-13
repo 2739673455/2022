@@ -33,21 +33,33 @@ int main(int argc, char* argv[])
 	for (string file : files)
 	{
 		temp_txt = file + ".txt";
-		feedback = rename(file.c_str(), temp_txt.c_str());
+		cmd = "move \"" + file + "\"" + " \"" + temp_txt + "\" >nul";
+		system(cmd.c_str());
 	}
-	system("pause");
+
 	for (string file : files)
 	{
 		temp_txt = file + ".txt";
-		temp_temp = file + ".temp";
-		feedback = rename(temp_txt.c_str(), temp_temp.c_str());
-		//cmd = "ahh.exe \"" + temp_temp + "\"" + " \"" + file + "\"";
-		//system(cmd.c_str());
+		feedback = rename(temp_txt.c_str(), file.c_str());
 	}
-	system("pause");
-	for (string file : files)
-	{
-		temp_temp = file + ".temp";
-		feedback = rename(temp_temp.c_str(), file.c_str());
-	}
+
+
+
+	////all
+	//for (string file : files)
+	//{
+	//	temp_txt = file + ".txt";
+	//	feedback = rename(file.c_str(), temp_txt.c_str());
+	//}
+	//system("pause");
+
+	//for (string file : files)
+	//{
+	//	temp_txt = file + ".txt";
+	//	temp_temp = file + ".temp";
+	//	feedback = rename(temp_txt.c_str(), temp_temp.c_str());
+
+	//	cmd = "ahh.exe \"" + temp_temp + "\"" + " \"" + file + "\"";
+	//	system(cmd.c_str());
+	//}
 }
