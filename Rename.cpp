@@ -5,6 +5,7 @@
 #include<Windows.h>
 #include<thread>
 #include<mutex>
+#include<deque>
 
 using namespace std;
 namespace fs = std::filesystem;
@@ -23,34 +24,42 @@ vector<string> getFiles(const string& self_name)
 	return files;
 }
 
-void convert1(const vector<string> &files,const size_t num_files,int& num_convert1,mutex & mutex1)
+void convert1(const vector<string>& files, deque<string>& filesqueue,int& condition, mutex& mutex1)
 {
 	string temp_txt;
-	while (num_convert1 < num_files)
+	for (auto file : files)
 	{
 		mutex1.lock();
-		++num_convert1;
-		temp_txt = files[num_convert1] + ".txt";
-		rename(files[num_convert1].c_str(), temp_txt.c_str());
+		temp_txt = file + ".txt";
+		rename(file.c_str(), temp_txt.c_str());
+		cout << file << " convert1" << endl;
+		filesqueue.push_back(file);
 		mutex1.unlock();
 	}
+	condition = 1;
 }
 
-void convert2(const vector<string> &files,const size_t num_files, int& num_convert2, int& num_convert1, mutex& mutex1)
+void convert2(const vector<string>& files, deque<string> &filesqueue, int& condition, mutex& mutex1)
 {
+	string file;
 	string temp_txt;
-	while (num_convert2 < num_files)
+	while(true)
 	{
 		mutex1.lock();
-		if (num_convert2 > num_convert1)
+		if (!filesqueue.empty())
+		{
+			Sleep(100);
+			file = filesqueue.front();
+			filesqueue.pop_front();
+			temp_txt = file + ".txt";
+			rename(temp_txt.c_str(), file.c_str());
+			cout << file << " convert2" << endl;
+		}
+		else if (condition == 1)
 		{
 			mutex1.unlock();
-			return;
+			break;
 		}
-		Sleep(100);
-		temp_txt = files[num_convert2] + ".txt";
-		rename(files[num_convert2].c_str(), temp_txt.c_str());
-		++num_convert2;
 		mutex1.unlock();
 	}
 }
@@ -59,31 +68,13 @@ int main(int argc, char* argv[])
 {
 	string self_name = fs::path(argv[0]).string();
 	vector<string> files = getFiles(self_name);
-	size_t num_files = files.size();
-	int num_convert1 = -1;
-	int num_convert2 = 0;
+	deque<string> filesqueue;
+	int condition = 0;
 	mutex mutex1;
 
-	thread convert_thread1(convert1, files, num_files, num_convert1, mutex1);
-	thread convert_thread2(convert2, files, num_files, num_convert2, num_convert1, mutex1);
+	thread convert_thread1([&]() {convert1(files, filesqueue, condition, mutex1); });
+	thread convert_thread2([&]() {convert2(files, filesqueue, condition, mutex1); });
 	convert_thread1.join();
 	convert_thread2.join();
-
-	////all
-	//for (string file : files)
-	//{
-	//	temp_txt = file + ".txt";
-	//	feedback = rename(file.c_str(), temp_txt.c_str());
-	//}
-	//system("pause");
-
-	//for (string file : files)
-	//{
-	//	temp_txt = file + ".txt";
-	//	temp_temp = file + ".temp";
-	//	feedback = rename(temp_txt.c_str(), temp_temp.c_str());
-
-	//	cmd = "ahh.exe \"" + temp_temp + "\"" + " \"" + file + "\"";
-	//	system(cmd.c_str());
-	//}
+	cout << "end" << endl;
 }
