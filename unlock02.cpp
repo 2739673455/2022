@@ -31,8 +31,8 @@ int main(int argc, char* argv[])
 	for (string file : files)
 	{
 		temp1 = file + ".txt";
-		cmd = "move \"" + file + "\" \"" + temp1 + "\" >nul";
-		system(cmd.c_str());
+		rename(file.c_str(), temp1.c_str());
+		cout << file << "convert 1" << endl;
 	}
 	Sleep(100);
 	for (string file : files)
@@ -41,11 +41,13 @@ int main(int argc, char* argv[])
 		temp2 = file + ".temp";
 		cmd = "move \"" + temp1 + "\" \"" + temp2 + "\" >nul";
 		system(cmd.c_str());
+		cout << file << "convert 2" << endl;
 	}
 	Sleep(100);
 	for (string file : files)
 	{
 		temp2 = file + ".temp";
 		rename(temp2.c_str(), file.c_str());
+		cout << file << "convert 3" << endl;
 	}
 }
