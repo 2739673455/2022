@@ -1,77 +1,105 @@
-#include<string>
-#include<vector>
 #include<iostream>
 #include<filesystem>
-#include<Windows.h>
-#include<thread>
-#include<mutex>
+#include<vector>
+#include<string>
 #include<deque>
+#include<Windows.h>
 
 using namespace std;
 namespace fs = std::filesystem;
 
-vector<string> getFiles(const string& self_name)
+class Solution
 {
-	string current_dir = fs::current_path().string();
-	vector<string> files;
-	for (const auto& file_path : fs::recursive_directory_iterator(current_dir))
+public:
+	Solution(string self_name)
 	{
-		if (!(file_path.is_directory()) and (file_path.path().string() != self_name) and (file_path.path().filename().string() != "ahh.exe"))
+		string current_dir = fs::current_path().string();
+		for (const auto& file_path : fs::recursive_directory_iterator(current_dir))
 		{
-			files.push_back(file_path.path().string());
+			if (!(file_path.is_directory()) and (file_path.path().string() != self_name))
+			{
+				m_files.push_back(file_path.path().string());
+			}
 		}
+		m_filesize = m_files.size();
 	}
-	return files;
-}
 
-void convert1(const vector<string>& files, deque<string>& filesqueue, int& condition, mutex& mutex1)
-{
-	string temp_txt;
-	for (auto file : files)
+	void convert1()
 	{
-		mutex1.lock();
-		temp_txt = file + ".txt";
-		rename(file.c_str(), temp_txt.c_str());
-		filesqueue.push_back(file);
-		mutex1.unlock();
+		string temp1;
+		for (string file : m_files)
+		{
+			temp1 = file + ".txt";
+			rename(file.c_str(), temp1.c_str());
+			++m_pos1;
+			printf("%s convert 1 %d\n", file.c_str(),m_pos1);
+		}
 	}
-	condition = 1;
-}
 
-void convert2(const vector<string>& files, deque<string>& filesqueue, int& condition, mutex& mutex1)
-{
-	string file;
-	string temp_txt;
-	while (true)
+	void convert2()
 	{
-		mutex1.lock();
-		if (!filesqueue.empty())
+		string file;
+		string temp1;
+		string temp2;
+		while (true)
 		{
-			Sleep(100);
-			file = filesqueue.front();
-			filesqueue.pop_front();
-			temp_txt = file + ".txt";
-			rename(temp_txt.c_str(), file.c_str());
+			if (m_pos2<m_pos1)
+			{
+				Sleep(100);
+				file = m_files[m_pos2];
+				temp1 = file + ".txt";
+				temp2 = file + ".temp";
+				m_cmd = "move \"" + temp1 + "\" \"" + temp2 + "\" >nul";
+				system(m_cmd.c_str());
+				++m_pos2;
+				printf("%s convert 2 %d\n", temp1.c_str(),m_pos2);
+			}
+			else if (m_pos2==m_filesize)
+			{
+				break;
+			}
 		}
-		else if (condition == 1)
-		{
-			mutex1.unlock();
-			break;
-		}
-		mutex1.unlock();
 	}
-}
+
+	void convert3()
+	{
+		string file;
+		string temp2;
+		while (true)
+		{
+			if (m_pos3 < m_pos2)
+			{
+				Sleep(100);
+				file = m_files[m_pos3];
+				temp2 = file + ".temp";
+				rename(temp2.c_str(), file.c_str());
+				++m_pos3;
+				printf("%s convert 3 %d\n", temp2.c_str(),m_pos3);
+			}
+			else if (m_pos3==m_filesize)
+			{
+				break;
+			}
+		}
+	}
+
+private:
+	vector<string> m_files;
+	string m_cmd;
+	int m_filesize;
+	int m_pos1 = 0;
+	int m_pos2 = 0;
+	int m_pos3 = 0;
+};
 
 int main(int argc, char* argv[])
 {
 	string self_name = fs::path(argv[0]).string();
-	vector<string> files = getFiles(self_name);
-	deque<string> filesqueue;
-	int condition = 0;
-	mutex mutex1;
-
-	thread convert_thread1([&]() {convert1(files, filesqueue, condition, mutex1); });
-	thread convert_thread2([&]() {convert2(files, filesqueue, condition, mutex1); });
-	convert_thread1.join();
-	convert_thread2.join();
+	Solution s1(self_name);
+	thread convertthread1(&Solution::convert1,&s1);
+	thread convertthread2(&Solution::convert2,&s1);
+	thread convertthread3(&Solution::convert3,&s1);
+	convertthread1.join();
+	convertthread2.join();
+	convertthread3.join();
 }
