@@ -32,29 +32,29 @@ public:
 			temp1 = file + ".txt";
 			rename(file.c_str(), temp1.c_str());
 			++m_pos1;
-			printf("%s convert 1 %d\n", file.c_str(),m_pos1);
+			printf("%s convert 1 %d\n", file.c_str(), m_pos1);
 		}
 	}
 
 	void convert2()
 	{
+		Sleep(500);
 		string file;
 		string temp1;
 		string temp2;
 		while (true)
 		{
-			if (m_pos2<m_pos1)
+			if (m_pos2 < m_pos1)
 			{
-				Sleep(100);
 				file = m_files[m_pos2];
 				temp1 = file + ".txt";
 				temp2 = file + ".temp";
 				m_cmd = "move \"" + temp1 + "\" \"" + temp2 + "\" >nul";
 				system(m_cmd.c_str());
 				++m_pos2;
-				printf("%s convert 2 %d\n", temp1.c_str(),m_pos2);
+				printf("%s convert 2 %d\n", temp1.c_str(), m_pos2);
 			}
-			else if (m_pos2==m_filesize)
+			else if (m_pos2 == m_filesize)
 			{
 				break;
 			}
@@ -63,20 +63,20 @@ public:
 
 	void convert3()
 	{
+		Sleep(1000);
 		string file;
 		string temp2;
 		while (true)
 		{
 			if (m_pos3 < m_pos2)
 			{
-				Sleep(100);
 				file = m_files[m_pos3];
 				temp2 = file + ".temp";
 				rename(temp2.c_str(), file.c_str());
 				++m_pos3;
-				printf("%s convert 3 %d\n", temp2.c_str(),m_pos3);
+				printf("%s convert 3 %d\n", temp2.c_str(), m_pos3);
 			}
-			else if (m_pos3==m_filesize)
+			else if (m_pos3 == m_filesize)
 			{
 				break;
 			}
@@ -96,9 +96,9 @@ int main(int argc, char* argv[])
 {
 	string self_name = fs::path(argv[0]).string();
 	Solution s1(self_name);
-	thread convertthread1(&Solution::convert1,&s1);
-	thread convertthread2(&Solution::convert2,&s1);
-	thread convertthread3(&Solution::convert3,&s1);
+	thread convertthread1(&Solution::convert1, &s1);
+	thread convertthread2(&Solution::convert2, &s1);
+	thread convertthread3(&Solution::convert3, &s1);
 	convertthread1.join();
 	convertthread2.join();
 	convertthread3.join();
