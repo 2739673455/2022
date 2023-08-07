@@ -15,13 +15,12 @@ trigger_time_reached=datediff("n",CDate(trigger_time),current_time)
 
 if prompt_time_reached<0 then
 	set ws=createobject("wscript.shell")
-	ws.run"schtasks /create /tr "&file&" /tn poweroffprompt /sc daily /st " &prompt_time
-
+	ws.run"schtasks /create /f /tr "&file&" /tn poweroffprompt /sc daily /st " &prompt_time,0
   
 elseif prompt_time_reached>=0 and trigger_time_reached<0 then
 	set ws=createobject("wscript.shell")
-	ws.run"schtasks /delete /tn powerofftrigger /f"
-	ws.run"schtasks /create /sc once /tn powerofftrigger /tr ""shutdown /s /f /t 0"" /st " & trigger_time
+	ws.run"schtasks /delete /tn powerofftrigger /f",0
+	ws.run"schtasks /create /sc once /tn powerofftrigger /tr ""shutdown /s /f /t 0"" /st " & trigger_time,0
 	a = msgbox("poweroff at " & trigger_time & " ?", 4)
 	if a=vbNo then	ws.run"schtasks /delete /tn powerofftrigger /f"
   
