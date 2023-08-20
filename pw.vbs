@@ -22,7 +22,7 @@ elseif prompt_time_reached>=0 and trigger_time_reached<0 then
 	ws.run"schtasks /delete /tn powerofftrigger /f",0
 	ws.run"schtasks /create /sc once /tn powerofftrigger /tr ""shutdown /s /f /t 0"" /st " & trigger_time,0
 	a = msgbox("poweroff at " & trigger_time & " ?", 4)
-	if a=vbNo then	ws.run"schtasks /delete /tn powerofftrigger /f"
+	if a=vbNo then	ws.run"schtasks /delete /tn powerofftrigger /f",0
   
 else
   msgbox "timeout"
