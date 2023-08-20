@@ -406,6 +406,9 @@ netsh advfirewall set currentprofile state off  关闭防火墙
 netsh firewall set service RemoteAdmin enable  开启远程管理
 wmic /node:[ip] /user:[用户名] /password:[密码] process call create "[指令]"
 
+(8)登陆界面隐藏账户
+reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList" /v [username] /t REG_DWORD /d 0
+
 23.扫描与爆破
 常见端口号：
 	21 FTP
