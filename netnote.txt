@@ -409,6 +409,11 @@ wmic /node:[ip] /user:[用户名] /password:[密码] process call create "[指�
 (8)登陆界面隐藏账户
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList" /v [username] /t REG_DWORD /d 0
 
+(9)结束进程
+taskkill /f /pid [processID]
+tskill [processID]
+wmic process where name=[processName]  delete
+
 23.扫描与爆破
 常见端口号：
 	21 FTP
