@@ -412,7 +412,7 @@ reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccou
 (9)结束进程
 taskkill /f /pid [processID]
 tskill [processID]
-wmic process where name=[processName]  delete
+wmic process where processid="[pid]" delete
 
 23.扫描与爆破
 常见端口号：
