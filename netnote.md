@@ -93,7 +93,7 @@
 `start c:\windows\explorer.exe`  开启资源管理器  
 
 # 5.用户与组管理
-## ①.用户管理  
+## ①用户管理  
 
 每个账户有唯一的SID，windows管理员uid`500`，普通用户uid从`1000`开始  
 账户密码存储位置：c:\windows\system32\config\SAM  
@@ -106,7 +106,7 @@
 `system`  系统账户  
 `local services`  本地服务账户  
 `network services`  网络服务账户  
-### 用户管理指令
+### 用户管理指令:  
 `net user` 查看用户列表  
 `net user [用户名] [密码]`  改密码  
 `net user [用户名] [密码] /add`  创建新用户  
@@ -124,7 +124,7 @@
 `network`  网络配置组  
 `print`  打印机组  
 `remote desktop`  远程桌面组  
-### 组管理指令
+### 组管理指令:  
 `net localgroup` 查看组  
 `net localgroup [组] [用户] /add`  将用户加入组  
 `net localgroup [组] [用户] /del`  将用户移除组  
