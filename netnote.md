@@ -158,6 +158,7 @@ namp
 `net use * /del` 删除所有连接   
 `net share ipc$` 创建ipc$  
 `net share ipc$ /del` 删除ipc$  
+`net share [共享名称]=[路径] /grant:administrator,full` 创建共享目录，设置用户访问权限  
 `./psexec.exe \\[ip] -u [username] -p [password] -i cmd` psexec远程获取shell  `HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\FilterAdministratorToken` 筛选管理员令牌
 
 - ## SAM破解密码:  
@@ -204,11 +205,14 @@ namp
 远程创建进程:  
 `wmic /node:[ip] /user:[用户名] /password:[密码] process call create "[指令]"`
 
-查看目标主机文件夹共享:  
-`wmic /node:[ip] /user:[用户名] /password:[密码] share list`
+查看文件夹共享:  
+`wmic share list`
 
-开启目标主机指定文件夹共享:  
-`wmic /node:[ip] /user:[用户名] /password:[密码] share call create “”,"Description","MaximumAllowed","Name","","Path",0`
+开启指定文件夹共享(只读权限):  
+`wmic share call create "","","MaximumAllowed","Name","","Path",0`
+
+删除指定共享文件夹:  
+`wmic share where "name='[共享目录名称]'" delete`
 
 查询进程:  
 `wmic process list brief`
