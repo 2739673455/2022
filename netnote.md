@@ -173,6 +173,9 @@ namp
 创建任务，只在用户登录时运行:  
 `schtasks /create /s [ip] /u [username] /p [password] /tn [任务名] /tr [任务指令] /sc [执行频率] /f`
 
+创建任务，与指定用户交互式运行:  
+`schtasks /create /tn [任务名] /tr [任务指令] /sc [执行频率] /st [执行时间] /ru [username] /rp [password] /it /f`
+
 创建任务，后台运行:  
 `schtasks /create /s [ip] /u administrator /p [password] /tn [任务名] /tr [任务指令] /sc [执行频率]  /ru system /f`
 
