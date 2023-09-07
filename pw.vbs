@@ -17,13 +17,13 @@ if prompt_time_reached<0 then
 	set ws=createobject("wscript.shell")
 	set objShell = createobject("Shell.Application")
 	ws.run"schtasks /create /f /tn poweroffprompt /tr "&file&" /sc daily /st " &prompt_time,0
-	objShell.ShellExecute "cmd.exe", "/c schtasks /create /f /tn powerofftrigger /tr ""shutdown /s /f /t 0"" /sc daily /st "&trigger_time&" /ru administrator /rp 123", "", "runas", 0
+	objShell.ShellExecute "cmd.exe", "/c schtasks /create /f /np /tn powerofftrigger /tr ""shutdown /s /f /t 0"" /sc daily /st "&trigger_time, "", "runas", 0
 	
 elseif prompt_time_reached>=0 and trigger_time_reached<0 then
 	set ws=createobject("wscript.shell")
 	set objShell = createobject("Shell.Application")
 	rem ws.run"schtasks /create /sc once /tn powerofftrigger /tr ""shutdown /s /f /t 0"" /st " & trigger_time,0
-	objShell.ShellExecute "cmd.exe", "/c schtasks /create /f /tn powerofftrigger /tr ""shutdown /s /f /t 0"" /sc daily /st "&trigger_time&" /ru administrator /rp 123", "", "runas", 0
+	objShell.ShellExecute "cmd.exe", "/c schtasks /create /f /np /tn powerofftrigger /tr ""shutdown /s /f /t 0"" /sc daily /st "&trigger_time, "", "runas", 0
 	a = msgbox("poweroff at " & trigger_time & " ?", 32+4)
 	if a=vbNo then	objShell.ShellExecute "cmd.exe", "/c schtasks /delete /f /tn powerofftrigger", "", "runas", 0
   
