@@ -182,6 +182,8 @@ namp
 立即运行任务:  
 `schtasks /run /s [ip] /u administrator /p [password] /tn [任务名]`
 
+`唤醒计算机运行此任务` 需要指定运行用户和密码，或取消登陆密码
+
 - ## 注册表查询与修改:
 查询所有用户的SID:  
 `wmic useraccount get name,sid`
