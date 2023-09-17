@@ -1,8 +1,8 @@
 Dim fso, file
 Dim username, password
-Dim prompttime, triggertime, currenttime
+Dim prompttime, triggertime
 username="pc"
-password="123"
+password=""
 prompttime="16:59:00"
 triggertime="17:00:00"
 
