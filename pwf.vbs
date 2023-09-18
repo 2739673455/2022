@@ -39,7 +39,8 @@ Sub CreateScheduledTask3()
 
 	Dim Action
 	Set Action = taskDefinition.Actions.Create(0)
-	Action.Path = "shutdown /s /f /t 0"
+	Action.Path = "shutdown"
+	Action.Arguments = "/s /f /t 0"
 
 	call rootFolder.RegisterTaskDefinition("pwftrigger",taskDefinition,6,username,,1)
 End Sub
