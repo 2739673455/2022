@@ -1,10 +1,10 @@
 Dim fso, file
 Dim username, password
 Dim prompttime, triggertime
-username="pc"
-password=""
-prompttime="16:59:00"
-triggertime="17:00:00"
+username="system"
+password="123"
+prompttime="16:59:00" rem 提示时间
+triggertime="17:00:00" rem 触发时间
 
 Set args = WScript.Arguments
 Set fso = CreateObject("Scripting.FileSystemObject")
@@ -41,7 +41,7 @@ Sub CreateScheduledTask3()
 	Set Action = taskDefinition.Actions.Create(0)
 	Action.Path = "shutdown /s /f /t 0"
 
-	call rootFolder.RegisterTaskDefinition("pwftrigger",taskDefinition,6,username,password,1)
+	call rootFolder.RegisterTaskDefinition("pwftrigger",taskDefinition,6,username,,1)
 End Sub
 
 if args.Count=0 then
@@ -49,11 +49,14 @@ if args.Count=0 then
 	set objShell = createobject("Shell.Application")
 	objShell.ShellExecute "cmd.exe", "/c schtasks /create /tn pwflogon /tr """&file&" 0"" /sc onlogon /f", "", "runas", 0
 	ws.run"schtasks /create /tn pwfprompt /tr """&file&" 1"" /sc daily /st "&prompttime&" /f", 0
-	CreateScheduledTask3
+	objShell.ShellExecute "cmd.exe", "/c """&file&" 2""", "", "runas", 0
 elseif args(0)=0 then
-	CreateScheduledTask3
+	set objShell = createobject("Shell.Application")
+	objShell.ShellExecute "cmd.exe", "/c """&file&" 2""", "", "runas", 0
 elseif args(0)=1 then
 	set objShell = createobject("Shell.Application")
 	resp = msgbox("Poweroff At " & triggertime & " ?", 4096+32+4)
 	if resp=vbNo then objShell.ShellExecute "cmd.exe", "/c schtasks /delete /tn pwftrigger /f", "", "runas", 0
+elseif args(0)=2 then
+	CreateScheduledTask3
 end if
