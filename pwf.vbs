@@ -36,6 +36,11 @@ Sub CreateScheduledTask3()
 	Dim startTime
 	startTime = "2023-01-01T"&triggertime
 	trigger.StartBoundary = startTime
+	
+	Dim repetitionPattern
+	Set repetitionPattern = trigger.Repetition
+	'repetitionPattern.Duration = "PT4M"
+	'repetitionPattern.Interval = "PT10M"
 
 	Dim Action
 	Set Action = taskDefinition.Actions.Create(0)
