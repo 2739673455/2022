@@ -229,3 +229,6 @@ namp
 
 查看wlan密码:  
 `netsh wlan show profile name="[网络名]" key=clear`
+
+事件查看器:  
+`wevtutil qe`
