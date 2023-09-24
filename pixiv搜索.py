@@ -2,6 +2,8 @@
 import os
 import re
 import sys
+import time
+import random
 import urllib
 import urllib3
 import requests
@@ -39,6 +41,7 @@ class Thumbnail_Download_Thread(QThread):
                     f.write(thumbnail_src.content)
                 self.textsig.emit(f'{id}已下载,{viewcount}')
             self.img_download_url.emit(str(img_download_url))
+            time.sleep(random.random() + 1)
 
     def run(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -144,7 +147,7 @@ class Pixiv(QDialog):
         self.thumbnail_download_thread.start()
 
     def get_url(self, headers, page):  # 获取搜索页缩略图的url,返回url列表
-        url = f'https://www.pixiv.net/ajax/search/artworks/{target_encoded}?word={target_encoded}&order=date_d&mode=all&p={page}&s_mode=s_tag&type=all&lang=zh&version=f17e4808608ed5d09cbde2491b8c9999df4f3962'
+        url = f'https://www.pixiv.net/ajax/search/artworks/{target_encoded}'
         headers['referer'] = url
         resp = requests.get(url, headers=headers, verify=False)
         thumbnail_urls = re.findall(',"url":"(.*?)",', resp.text)
@@ -191,8 +194,9 @@ if __name__ == "__main__":
     path_t = 'D:/Pixiv_picture/' + target + '/thumbnail/'
     path_i = 'D:/Pixiv_picture/' + target + '/'
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36',
-        'Cookie': 'first_visit_datetime_pc=2022-12-15+20%3A36%3A48; p_ab_id=3; p_ab_id_2=7; p_ab_d_id=815045519; yuid_b=QHdmlZM; c_type=32; privacy_policy_notification=0; a_type=1; b_type=1; _fbp=fb.1.1671104216530.1386501833; adr_id=uTbg186QFFz1PjBL5xPZ11nRgV2rEY9Ck4baiyMbporOqzZU; login_ever=yes; __utmv=235335808.|2=login%20ever=yes=1^3=plan=normal=1^5=gender=male=1^6=user_id=25093650=1^9=p_ab_id=3=1^10=p_ab_id_2=7=1^11=lang=zh=1; __utma=235335808.696882263.1671104211.1673613044.1674631582.6; _im_vid=01H1P5YCN86PTN911WZ8Z8Y4GB; PHPSESSID=25093650_WdcaBYCbyGDuNkeC7cyPUrODnc5cmbzE; _ga_MZ1NL4PHH0=GS1.1.1685445367.3.0.1685445370.0.0.0; _gcl_au=1.1.1709275288.1685446715; _im_uid.3929=i.1kkV9pL8SgKq1yDtyAuepA; privacy_policy_agreement=6; howto_recent_view_history=109720544; QSI_S_ZN_5hF4My7Ad6VNNAi=v:0:0; _ga_ZPL8LPMDK3=GS1.1.1690979867.2.1.1690979897.0.0.0; _gid=GA1.2.1266039207.1691290595; __cf_bm=ewB_c0B7yJpR.nfH8XL.1DL4pKNLnuHNlZAxnGzGpYQ-1691295228-0-ASYJpyo/jF+kAv0MfRcho4/VT05FkXMXAnz6ODfERqAmvHgClVKVYoT1vHc53LPjl/PAnmfsFV22nUDI2aho2PmIfmecwlwMdJguwWVUmL8B; _ga=GA1.1.696882263.1671104211; cto_bundle=X9Vq0F9uakRXbVphSWR0JTJCWVAxRTUwSHNDYmZ0bnUwWXRjaWZXUjBHJTJCVDlmMUxxd29jd0p5OEdtZGNqMVU2WUVTNWdqZnJXendUN2gxU09DOSUyRkU4UFZOMlBTRGJwZ3FmeFRYNXpUaGFaYndOQ3JEUDB0bnowS0Uxc2l3bXlsZlZUbTVHdzRnbUVpazlDTUc1YmFJajREbkMyNEElM0QlM0Q; cto_bundle=X9Vq0F9uakRXbVphSWR0JTJCWVAxRTUwSHNDYmZ0bnUwWXRjaWZXUjBHJTJCVDlmMUxxd29jd0p5OEdtZGNqMVU2WUVTNWdqZnJXendUN2gxU09DOSUyRkU4UFZOMlBTRGJwZ3FmeFRYNXpUaGFaYndOQ3JEUDB0bnowS0Uxc2l3bXlsZlZUbTVHdzRnbUVpazlDTUc1YmFJajREbkMyNEElM0QlM0Q; _ga_75BBYNYN9J=GS1.1.1691290592.31.1.1691296041.0.0.0; cf_clearance=QJrpxy_XOZVyGwDVt2tLAi_gGHzTuqb0BJ0xp1.f5Hs-1691296041-0-1-e705599c.175a7181.b004067c-0.2.1691296041',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36 Edg/117.0.2045.36',
+
+        'Cookie': 'first_visit_datetime_pc=2023-03-22+23%3A46%3A27; p_ab_id=7; p_ab_id_2=7; p_ab_d_id=268037037; yuid_b=JSeGdIU; privacy_policy_notification=0; a_type=1; b_type=1; login_ever=yes; c_type=25; _fbp=fb.1.1691290932968.366527084; privacy_policy_agreement=6; __utmz=235335808.1694517025.1.1.utmcsr=(direct)|utmccn=(direct)|utmcmd=(none); __cf_bm=hks_l_xU_LWD.0JYrWFCoioS_HzhgnzALqS._48M_mM-1695515414-0-ARxcdhHYeSL3WvYIU2S/u1m0nGflARcaKxQx/2huelNaMK51js8RC8OYg3Et0+QHHQTvUVWxCTeSo4ntDB//mJNit9TOOw5aQHIdf0nLfArr; __utma=235335808.811011881.1679496389.1694517025.1695515428.2; __utmc=235335808; __utmt=1; _gid=GA1.2.637506940.1695515431; _gcl_au=1.1.316082557.1695515437; PHPSESSID=92669508_Tns1ccTgBT2mHTmXIDhrIv9kqm5qDaJm; device_token=39aacf357b82306419530e5e78137e4a; _ga_MZ1NL4PHH0=GS1.1.1695515439.6.0.1695515443.0.0.0; __utmv=235335808.|2=login%20ever=yes=1^3=plan=normal=1^5=gender=male=1^6=user_id=92669508=1^9=p_ab_id=7=1^10=p_ab_id_2=7=1^11=lang=zh=1; QSI_S_ZN_5hF4My7Ad6VNNAi=v:0:0; _im_vid=01HB29H4SJ2S5AV2CT1Y44N823; cf_clearance=e_ifxOXYqx0G_SrTHlXVB8lwa4N7Iun23k.hZZSBG0Y-1695515458-0-1-550efdb.f64f8a9.5251b03b-0.2.1695515458; user_language=zh; cto_bundle=pIho1V9XYWRFNGROOHVBSUdUaXFjT1g1ZzFRRmZuQzVKSWVRMmIyRk9GVzNRU2ExV09DbGtMN2U2RktBMWQzcWR1T3FMSGdaM1VWZGlkTUtKQkNnTkRqYTBFTXlMTHF5YnNGaGZ3OTBWWVNoa3JoaXlNeDRIOHlyV1gyQ3RTN2hLUXVzWHUwbGRmN3R0c3JKOFFMRExseEd0aVElM0QlM0Q; _ga=GA1.2.811011881.1679496389; _gat_UA-1830249-3=1; __utmb=235335808.8.10.1695515428; _ga_75BBYNYN9J=GS1.1.1695515428.15.1.1695515515.0.0.0',
     }
     app = QApplication(sys.argv)
     w = Pixiv()
