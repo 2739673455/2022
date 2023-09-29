@@ -32,6 +32,7 @@
 `ping -n [num] [ip]` 指定ping几个包  
 `ping -l [size] [ip]` 指定ping包大小  
 手动解析域名：`nslookup www.jd.com`  
+`HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002BE10318}\` 找到相应网卡，新建NetworkAddress修改MAC地址
 
 # 3.Windows文件处理
 ## 浏览文件：
