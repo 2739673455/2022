@@ -170,7 +170,8 @@ HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System\Fil
 		登陆界面隐藏账户:
 			reg add "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon\SpecialAccounts\UserList" /v [username] /t REG_DWORD /d 0
 		修改网卡MAC:
-			HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002BE10318}\
+			HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\{4D36E972-E325-11CE-BFC1-08002BE10318}\ ->新建NetworkAddress 字符串值
+			第二个字符必须2,6,A,E其中之一
 
 	wmic远程控制:
 		netsh advfirewall set currentprofile state off 关闭防火墙
