@@ -250,15 +250,15 @@
 		replaceAll(BiFunction<? super K, ? super V, ? extends V> function);  需要重写一个apply抽象方法，抽象方法的形参分别是key和旧value，抽象方法的返回值是新value。
 
 		BiFunction<Integer,String,String> bi =new BiFunction<Integer, String, String>() {
-            @Override
-            public String apply(Integer key, String oldValue) {//方法的返回值是新value
-                if(key % 2 == 0){
-                    return oldValue.substring(0,1).toUpperCase().concat(oldValue.substring(1));
-                }
-                return oldValue;
-            }
-        };
-        map.replaceAll(bi);
+			@Override
+			public String apply(Integer key, String oldValue) {//方法的返回值是新value
+				if(key % 2 == 0){
+					return oldValue.substring(0,1).toUpperCase().concat(oldValue.substring(1));
+				}
+				return oldValue;
+			}
+		};
+		map.replaceAll(bi);
 
 	- 查：
 		containsKey(key);
