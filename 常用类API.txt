@@ -1,0 +1,276 @@
+常用类API
+
+一、包装类
+	1.初始化
+		Integer num = 1;
+		Integer.valueOf(1);
+	2.将String类型的字符串转为基本数据类型
+		Integer.parseInt(String str);
+		str.charAt(0);
+	3.比较大小关系
+		Integer.compare(value1, value2);
+	4.单个字符转换大小写
+		Character.toUpperCase(char c);
+		Character.toLowerCase(char c);
+
+二、Math类(java.lang)
+	Math.random();
+	Math.sqrt(value);
+	Math.abs(value);
+	Math.max(value1, value2);
+	Math.min(value1, value2);
+	Math.floor(value);
+	Math.ceil(value);
+	Math.round(value);  等价于(int)(a+0.5)
+	Math.pow(value1, value2);
+
+三、Random类(java.util)
+	Random random = new Random();  以当前系统时间为种子生成随机数
+	random = new Random(100);  给定种子生成随机数
+	random.nextInt();  int范围内任意值
+	random.nextInt(10);  [0,10)任意值
+	random.nextInt(10,100);  [10,100)任意值
+	random.nextDouble();  [0,1)任意小数
+	random.nextBoolean();
+
+四、BigInteger与BigDecimal(java.math)
+	BigDecimal b1 = new BigDecimal(String str);
+	BigDecimal b2 = new BigDecimal(String str);
+	b1.add(b2);
+	b1.subtract(b2);
+	b1.multiply(b2);
+	b1.divide(b2);  若除不尽会报异常
+	b1.divide(b2, int i, RoundingMode.CEILING);  第i位无论是什么，都进位
+	b1.remainder(b2);
+
+五、Arrays(java.util)
+	Arrays.toString(arr);
+	Arrays.sort(arr);
+	Arrays.copyOf(arr, int length);  将数组复制到指定长度的新数组
+	Arrays.copyOfRange(arr, begin, end);  复制arr[begin:end)
+	Arrays.fill(arr, int i);  数组元素全部初始化为i
+	Arrays.equals(arr1, arr2)  两个数组的元素顺序、个数、类型完全一致，才为true
+	Arrays.binarySearch(arr, target);  使用二分查找需确保数组有序，若元素不存在，返回 -插入点-1
+	System.arraycopy(Object src, int srcPos, Object dest, int destPos, int length)  将src中从srcPos开始length长度的元素复制到dest的destPos。
+	Arrays.asList();  转为List类型
+
+六、System类
+	System.getProperty("os.name");  获取操作系统信息
+	System.currentTimeMillis();  获取当前时间
+
+七、Runtime类
+	Runtime jvm = Runtime.getRuntime();  获取Runtime类的唯一对象
+	long totalMemory = jvm.totalMemory();  总内存
+    long freeMemory = jvm.freeMemory();  空闲内存
+    long useMemory = totalMemory - freeMemory;  已使用内存
+
+八、String类
+	str.length();
+	str.toUpperCase();  全部大写
+	str.toLowerCase();  全部小写
+	char[] c = str.toCharArray();  转换为char数组
+	str.charAt(index);
+	String sub = str.subString(i);  截取[i,)
+	String sub = str.subString(begin, end);  截取[begin,end)
+	str.startsWith(value);  是否以value开头
+	str.endsWith(value);  是否以value结尾
+	str.contains(value);  是否包含value
+	str.indexOf(value);  value首次出现的下标
+	str.lastIndexOf(value);  value末次出现的下标
+	str1.equals(str2);  比较内容
+	str1.equalsIgnoreCase(str2);  不区分大小写比较内容
+	str1.compareTo(str2)；  按编码值比较大小
+	str1.compareToIgnoreCase(str2)；  不区分大小按编码值比较大小
+	str.isEmpty();  是否不包含任何字符，包括空格、\t、\n等
+	str.isBlank();  是否不包含除了空白字符（空格、\t、\n等)以外的字符
+	"".equals(str)；
+	Objects.equals("", str)；
+	str1.concat(str2);  拼接字符串
+		(+:结果会在常量池被共享
+		concat:结果一定是new的，这个新new不会被共享
+		凡是“”，在常量池中都是共享的字符串对象
+		就算新new的字符串对象不能共享，但也会想尽办法与之前的字符串对象共享byte[]数组)
+	str.matches(正则表达式)  是否满足正则表达式
+	str = str.replaceAll(正则表达式, value);  将所有满足正则的所有字符替换为value
+	str = str.replaceFirst(正则表达式, value);  将首个满足正则的字符替换为value
+	str = str.replace(value1, value2);  将所有value1替换为value2
+	String[] strings = str.split(value);  将str按value为分隔拆分为字符串数组
+	str = str.trim();  去掉前后空白字符（包括空格\t\n等）
+	str2 = str1.intern();  如果常量池中存在当前字符串, 就会直接返回当前字符串. 如果常量池中没有此字符串, 会将此字符串放入常量池中后, 再返回
+	byte[] bytes = str.getBytes("UTF-8");  字符串按UTF-8编码后的byte数组
+
+九、可变字符串类型 StringBuffer与StringBuilder(java.lang)
+	- 增：
+		append(value)
+		insert(index, value)
+	- 删：
+		delete(begin, end)
+		deleteCharAt(index)
+	- 改：
+		setCharAt(index, value)
+		setLength(value)
+		replace(begin, end, value)
+		reverse()
+	- 查：
+		indexOf(value)
+		lastIndexOf(value)
+		charAt(index)
+	- 比较：
+		str1.toString().equals(str2.toString());
+
+十、字符串拼接 StringJoiner(java.util)
+	String[] arr = {"hello","world","java"};
+    StringJoiner joiner = new StringJoiner("-", "[", "]");
+    for (int i = 0; i < arr.length; i++) {
+        joiner.add(arr[i]);
+    }
+    System.out.println(joiner);  //"[hello-world-java]"
+
+十一、集合
+	1.Collection系列的集合以Collection为根接口，这个接口中定义了所有该系列的集合“共有”的方法
+	- 增：
+		add(value)
+		addAll(collection)
+	- 删：
+		remove(value)
+		removeIf(p)
+		clear()
+		collection1.removeAll(collection2)  减去交集
+		collection1.retainAll(collection2)  取交集
+	- 改（无）
+	- 查：
+		contains(value)
+		containsAll(collection)
+		size()
+		isEmpty()
+	- 遍历
+		直接foreach（最简洁，最推荐的方法）
+		将元素放到Object[]数组中返回，然后遍历数组（不太推荐）
+		用迭代器遍历
+			1)先用集合对象.iterator()得到迭代器对象
+			2)用循环 + 迭代器的hasNext()和next()实现集合的遍历
+			Iterator iterator = collection.iterator();//这个方法可以拿到一个Iterator接口的实现类对象
+        	while(iterator.hasNext()){
+        	    Object obj = iterator.next();
+        	    System.out.println(obj);
+
+    2.Collection的子接口：Set
+    Set子接口的实现类有一个共同特征：元素不可重复
+	常用的实现类：HashSet、LinkedHashSet、TreeSet等
+	- HashSet：元素不可重复，完全无序。（这里的无序，是指完全没有规律）
+	- LinkedHashSet：元素不可重复，元素有顺序，按照添加顺序排列，因为底层有一个双向链表
+	- TreeSet：元素不可重复，元素有大小顺序,一边添加一边排序。依赖于Comparable接口 或 Comparator接口
+
+	3.Collection的子接口：List
+	List系列的集合有一个共同特征：元素可以重复，元素可以通过下标进行访问。无论底层是不是数组，都可以通过下标进行访问，我们称为有序的（有下标顺序）
+	List的常见实现类有：ArrayList、LinkedList、Vector、Stack等
+	- 增：
+		add(value)
+		add(index, value)
+		addAll(collection)
+		addAll(index,collection)
+	- 删：
+		clear()
+		remove(index)
+		remove(value)
+		removeAll(collection)
+		removeIf(p)
+		retainAll(collection)
+	- 改：
+		set(index,value)
+		replaceAll(UnaryOperator对象)
+	- 查：
+		contains(value)
+	 	containsAll(collection)
+	  	size()
+	  	isEmpty()
+		get(index)
+		indexOf(value)
+		lastIndexOf(value)
+	- 遍历：
+		直接foreach（最简洁，最推荐的方法）
+		将元素放到Object[]数组中返回，然后遍历数组（不太推荐）
+		用Iterator迭代器遍历：Iterator迭代器只能从头开始遍历
+		用ListIterator迭代器遍历：
+	    	ListIterator迭代器可以从任意位置开始遍历
+	    	ListIterator迭代器可以从左往右，也可以从右往左
+    		在遍历过程中支持对集合进行增、删、改、查
+    转换为数组：
+	    Object[] all = list.toArray();
+
+十二、栈 Stack LinkedList
+	push(value);  添加元素到栈顶
+	pop();  取出栈顶元素
+	peek();  查看栈顶元素
+	search(target);  查看目标从栈顶开始是第几个，若不存在返回-1
+
+十三、队列 Queue Deque LinkedList
+	单向队列：
+		-抛出异常的方法：
+			add(value);
+			remove();
+			element();
+		-返回特殊值的方法：
+			offer(value);
+			poll();
+			peek();
+	双向队列：
+		-抛出异常的方法：
+			addFirst(value);
+			addLast(value);
+			removeFirst();
+			removeLast();
+			getFirst();
+			getLast();
+		-返回特殊值的方法：
+			offerFirst(value);
+			offerLast(value);
+			pollFirst();
+			pollLast();
+			peekFirst();
+			peekLast();
+
+十四、Map
+	Map<K,V>
+
+	1.
+		List:元素可重复，可修改
+		Set:元素不可重复，不可修改
+		Map:key不允许重复，value允许重复；key不允许修改，value允许修改
+
+	2.方法：
+	- 增：
+		put(key.value);
+		putAll(map);
+	- 删：
+		remove(key);
+		remove(key,value);  必须key和value都匹配才删除
+	- 改：
+		replace(key,新Value);
+		replave(key,旧value,新Value);  必须key和旧value都匹配，才会用新Value覆盖旧value
+		replaceAll(BiFunction<? super K, ? super V, ? extends V> function);  需要重写一个apply抽象方法，抽象方法的形参分别是key和旧value，抽象方法的返回值是新value。
+	- 查：
+		containsKey(key);
+		containsValue(value);
+		size();
+	- 遍历：
+		遍历所有key: Set<K> allKey = keySet();
+		遍历所有value: Set<V> allValue = valueSet();
+		遍历所有键值对: Set<Map.Entry<K,V>> allMap = entrySet();
+
+	3.Map的常用实现类：
+		HashMap:较新的哈希表
+			完全无序
+			允许key或value为null
+			线程不安全，效率高
+		LinkedHashMap:双向链表+哈希表，称为链式哈希表
+			会保留键值对顺序
+		TreeMap:红黑树
+			按照key的大小顺序排序
+			依赖于Comparable或Comparator接口
+		Hashitable:古老的哈希表
+			完全无序
+			不允许key或value为null
+			线程安全，效率低
+		Properties:属性表，是Hashtable的子类
+			key,value都是固定String类型，通常用于存储系统属性的键值对
