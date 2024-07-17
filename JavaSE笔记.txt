@@ -653,6 +653,9 @@
 		6.反树化：当对HashMap做如下两个操作，且满足对应条件时，会反树化
 			1.remove操作：若红黑树的根结点，根的左结点，根的右结点，根的左结点的左结点之一为null时，会反树化
 			2.put操作：若触发了扩容，且红黑树结点数量<=UNTREEIFY_THRESHOLD(值为6)，会反树化
+	6.HashMap按值排序
+		List<Map.Entry<T1, T2>> list = new ArrayList<>(HashMap.entrySet());
+        list.sort((o1, o2) -> o1.getValue() - o2.getValue());
 
 30.多线程
 	1.实现多线程

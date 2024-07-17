@@ -3,21 +3,21 @@
         ifconfig [接口名] / ip addr [show] [接口名]
     2.修改网络配置文件
         vi /etc/sysconfig/network-scripts/ifcfg-ens33
-            TYPE="Ethernet"     #网络类型（通常是Ethernet）
-            PROXY_METHOD="none"
-            BROWSER_ONLY="no"
-            BOOTPROTO="dhcp"    #IP的配置方法[none|static|bootp|dhcp]（引导时不 使用协议|静态分配IP|BOOTP协议|DHCP协议）
-            DEFROUTE="yes"
-            IPV4_FAILURE_FATAL="no"
-            IPV6INIT="yes"
-            IPV6_AUTOCONF="yes"
-            IPV6_DEFROUTE="yes"
-            IPV6_FAILURE_FATAL="no"
-            IPV6_ADDR_GEN_MODE="stable-privacy"
-            NAME="ens33"   
-            UUID="e83804c1-3257-4584-81bb-660665ac22f6"     #随机id
-            DEVICE="ens33"      #接口名（设备,网卡）
-            ONBOOT="yes"   #系统启动的时候网络接口是否有效（yes/no）
+            TYPE=Ethernet     #网络类型（通常是Ethernet）
+            PROXY_METHOD=none
+            BROWSER_ONLY=no
+            BOOTPROTO=static    #IP的配置方法[none|static|bootp|dhcp]（引导时不 使用协议|静态分配IP|BOOTP协议|DHCP协议）
+            DEFROUTE=yes
+            IPV4_FAILURE_FATAL=no
+            IPV6INIT=yes
+            IPV6_AUTOCONF=yes
+            IPV6_DEFROUTE=yes
+            IPV6_FAILURE_FATAL=no
+            IPV6_ADDR_GEN_MODE=stable-privacy
+            NAME=ens33   
+            UUID=e83804c1-3257-4584-81bb-660665ac22f6     #随机id
+            DEVICE=ens33      #接口名（设备,网卡）
+            ONBOOT=yes   #系统启动的时候网络接口是否有效（yes/no）
             IPADDR=192.168.10.100  
             GATEWAY=192.168.10.2      
             DNS1=192.168.10.2
@@ -271,6 +271,15 @@
             $*  #代表命令行中所有的参数，把所有的参数看成一个整体
             $@  #代表命令行中所有的参数，把每个参数区分对待
             $?  #最后一次执行的命令的返回状态。如果为0，证明上一个命令正确执行。如果非0，则证明上一个命令执行不正确
+        3.数组
+            1.数组名=(值1 值2 值3)
+            2.取数组元素
+                ${数组名[下标]}  #取单个元素
+                ${数组名[@]}  #取所有元素
+                ${数组名[*]}  #取所有元素
+            3.取数组长度
+                ${#数组名[@]}
+                ${#数组名[*]}
     2.运算符
         $((运算式))
         $[运算式]
@@ -342,18 +351,19 @@
         1.basename  #取文件路径里的文件名称
         2.dirname  #取文件路径的绝对路径名称
         3.自定义函数
-            function funname()
+            function func()
             {
                 程序
             }
+            函数调用:func
     7.shell工具
         1.cut
             cut 选项 文件名
                 -f  #列号，提取第几列
-                -d  #分隔符，按照指定分隔符分割列，默认是制表符“\t”
+                -d  #分隔符，按照指定分隔符分割列，默认是制表符"\t"
                 -c  #按字符进行切割,后加n,表示取第几列,比如 -c 1
         2.awk
-            awk 选项 ‘/pattern1/{action1} /pattern2/{action2}’ 文件名
+            awk 选项 '/pattern1/{action1} /pattern2/{action2}' 文件名
                 pattern  #查找的内容，就是匹配模式
                 action  #找到匹配内容时所执行的命令
                 -F  #指定输入文件折分隔符
@@ -362,3 +372,5 @@
                 FILENAME  #文件名
                 NR  #已读的记录数(行号)
                 NF	#浏览记录的域的个数(切割后，列的个数)
+        3.rsync远程同步工具
+            rsync -av 本地文件 用户名@主机:远程目录

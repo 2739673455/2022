@@ -1,0 +1,298 @@
+1.hadoop环境搭建
+    1.配置ip,hostname,hosts
+        vi /etc/sysconfig/network-scripts/ifcfg-ens33
+            BOOTPROTO=static
+            ONBOOT=on
+            IPADDR
+            GATEWAY
+            DNS
+        vi /etc/hostname
+        vi /etc/hosts
+    2.配置yum源，安装工具
+        /etc/yum.repos.d/CentOS-Base.repo
+        yum -y install epel-release net-tools vim psmisc nc rsync lrzsz ntp libzstd openssl-static tree iotop git
+    3.关闭防火墙
+        systemctl stop firewalld
+        systemctl disable firewalld
+    4.创建用户
+        useradd atguigu
+        passwd atguigu
+        visudo  #赋予root权限
+    5.创建目录
+        mkdir /opt/module
+        mkdir /opt/software
+        chown atguigu:atguigu /opt/module /opt/software
+    6.解压jdk与hadoop
+        tar -zxvf jdk-8u212-linux-x64.tar.gz -C /opt/module
+        tar -zxvf hadoop-3.3.4.tar.gz -C /opt/module
+    7.配置环境变量
+        sudo vim /etc/profile.d/my_env.sh
+            export JAVA_HOME=/opt/module/jdk1.8.0_212
+            export PATH=$PATH:$JAVA_HOME/bin
+            export HADOOP_HOME=/opt/module/hadoop-3.3.4
+            export PATH=$PATH:$HADOOP_HOME/bin
+            export PATH=$PATH:$HADOOP_HOME/sbin
+        source /etc/profile  #让环境变量生效
+
+2.集群配置
+    1.配置ssh免密登录
+        ssh-keygen -t rsa  #生成密钥
+        ssh-copy-id 主机名  #分发密钥
+        #密钥在/home/atguigu/.ssh目录下
+        问题：
+            1.ssh分发之后登录仍需密码
+                用户目录权限过大，修改为700
+    2.常用脚本文件
+        #/home/atguigu/bin目录下
+        1.集群主机名单脚本hosts.sh
+            hadoop102
+            hadoop103
+            hadoop104
+        2.集群分发脚本xsync
+            #!/bin/bash
+            if [ $# -lt 1 ];then
+                echo no argument
+                exit
+            fi
+            hosts=(`cat $HOME/bin/hosts.sh`)
+            for host in ${hosts[@]};do
+                echo ========== $host ==========
+                for file in $@;do
+                    if [ -e $file ];then
+                        pdir=$(cd -P $(dirname $file); pwd)
+                        fname=$(basename $file)
+                        ssh $host "mkdir -p $pdir"
+                        rsync -av $pdir/$fname $host:$pdir
+                    else
+                        echo $file not exists
+                    fi
+                done
+            done
+        3.集群工具脚本myhadoop.sh
+            #!/bin/bash
+            if [ $# -lt 1 ];then
+                echo no argument
+                exit
+            fi
+            hosts=(`cat $HOME/bin/hosts.sh`)
+            hdfs_host=${hosts[0]}
+            yarn_host=${hosts[1]}
+            histoty_host=${hosts[0]}
+            function start(){
+                echo ========== hadoop start ==========
+                ssh $hdfs_host start-dfs.sh
+                ssh $yarn_host start-yarn.sh
+                ssh $histoty_host mapred --daemon start historyserver
+            }
+            function stop(){
+                echo ========== hadoop stop ==========
+                ssh $histoty_host mapred --daemon stop historyserver
+                ssh $yarn_host stop-yarn.sh
+                ssh $hdfs_host stop-dfs.sh
+            }
+            function clean(){
+                echo ========== hadoop clean ==========
+                for host in ${hosts[@]};do
+                    ssh $host rm -rf $HADOOP_HOME/data
+                    ssh $host rm -rf $HADOOP_HOME/logs
+                    ssh $host sudo rm -rf /tmp/*
+                done
+                echo ========== clean finish ==========
+            }
+            function jpsall(){
+                for host in ${hosts[@]};do
+                    echo ========== $host ==========
+                    ssh $host jps
+                done
+            }
+            function compare(){
+                echo ========== hadoop compare ==========
+                files=(
+                    /opt/module/hadoop-3.3.4/etc/hadoop/core-site.xml
+                    /opt/module/hadoop-3.3.4/etc/hadoop/hdfs-site.xml
+                    /opt/module/hadoop-3.3.4/etc/hadoop/yarn-site.xml
+                    /opt/module/hadoop-3.3.4/etc/hadoop/mapred-site.xml
+                    /opt/module/hadoop-3.3.4/etc/hadoop/workers
+                )
+                for file in ${files[@]};do
+                    if [ ! -f $file ];then
+                        echo $file not exists
+                        continue
+                    fi
+                    for host in ${hosts[@]};do
+                        ssh $host cat $file | diff $file - > /dev/null || echo $host is different
+                    done
+                done
+                echo ========== compare finish ==========
+            }
+            case $1 in
+            "start")start;;
+            "stop")stop;;
+            "clean")clean;;
+            "show")jpsall;;
+            "compare")compare;;
+            *)echo argument error;;
+            esac
+    3.集群配置文件
+        $HADOOP_HOME/etc/hadoop
+        1.core-site.xml
+            <configuration>
+                <!-- 指定NameNode的地址 -->
+                <property>
+                    <name>fs.defaultFS</name>
+                    <value>hdfs://hadoop102:8020</value>
+                </property>
+
+                <!-- 指定hadoop数据的存储目录 -->
+                <property>
+                    <name>hadoop.tmp.dir</name>
+                    <value>/opt/module/hadoop-3.3.4/data</value>
+                </property>
+
+                <!-- 配置HDFS网页登录使用的静态用户为atguigu -->
+                <property>
+                    <name>hadoop.http.staticuser.user</name>
+                    <value>atguigu</value>
+                </property>
+            </configuration>
+        2.hdfs-site.xml
+            <configuration>
+                <!-- nn web端访问地址-->
+                <property>
+                    <name>dfs.namenode.http-address</name>
+                    <value>hadoop102:9870</value>
+                </property>
+
+                <!-- 2nn web端访问地址-->
+                <property>
+                    <name>dfs.namenode.secondary.http-address</name>
+                    <value>hadoop104:9868</value>
+                </property>
+            </configuration>
+        3.yarn-site.xml
+            <configuration>
+                <!-- 指定MR走shuffle -->
+                <property>
+                    <name>yarn.nodemanager.aux-services</name>
+                    <value>mapreduce_shuffle</value>
+                </property>
+
+                <!-- 指定ResourceManager的地址-->
+                <property>
+                    <name>yarn.resourcemanager.hostname</name>
+                    <value>hadoop103</value>
+                </property>
+
+                <!-- 环境变量的继承 -->
+                <property>
+                    <name>yarn.nodemanager.env-whitelist</name>
+                    <value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_MAPRED_HOME</value>
+                </property>
+            </configuration>
+        4.mapred-site.xml
+            <configuration>
+                <!-- 指定MapReduce程序运行在Yarn上 -->
+                <property>
+                    <name>mapreduce.framework.name</name>
+                    <value>yarn</value>
+                </property>
+            </configuration>
+        5.workers
+            hadoop102
+            hadoop103
+            hadoop104
+    4.集群启动
+        1.初次启动需要格式化Namenode
+            hdfs namenode -format
+            如果集群在运行过程中报错，需要重新格式化NameNode的话，一定要先停止namenode和datanode进程，并且要删除所有机器的data和logs目录以及/tmp，然后再进行格式化
+        2.在Namenode节点启动HDFS
+            start-dfs.sh
+        3.在配置了ResourceManager的节点(hadoop103)启动YARN
+            start-yarn.sh
+        3.Web查看HDFS的Namenode
+            http://hadoop102:9870
+        4.Web查看YARN的ResourceManager
+            http://hadoop103:8088
+    5.配置历史服务器  
+        1.mapred-site.xml
+            <!-- 历史服务器端地址 -->
+            <property>
+                <name>mapreduce.jobhistory.address</name>
+                <value>hadoop102:10020</value>
+            </property>
+
+            <!-- 历史服务器web端地址 -->
+            <property>
+                <name>mapreduce.jobhistory.webapp.address</name>
+                <value>hadoop102:19888</value>
+            </property>
+        2.启动历史服务器
+            mapred --daemon start historyserver
+        3.Web查看JobHistory
+            http://hadoop102:19888/jobhistory
+    6.配置日志的聚集
+        1.yarn-site.xml
+            <!-- 开启日志聚集功能 -->
+            <property>
+                <name>yarn.log-aggregation-enable</name>
+                <value>true</value>
+            </property>
+
+            <!-- 设置日志聚集服务器地址 -->
+            <property>  
+                <name>yarn.log.server.url</name>  
+                <value>http://hadoop102:19888/jobhistory/logs</value>
+            </property>
+
+            <!-- 设置日志保留时间为7天 -->
+            <property>
+                <name>yarn.log-aggregation.retain-seconds</name>
+                <value>604800</value>
+            </property>
+    7.集群启动/停止方式总结
+        1.各个模块分开启动/停止
+            1.整体启动/停止HDFS
+                start-dfs.sh / stop-dfs.sh
+            2.整体启动/停止YARN
+                start-yarn.sh / stop-yarn.sh
+        2.各个服务组件逐一启动/停止
+            1.启动/停止HDFS组件
+                hdfs --daemon start/stop namenode
+                hdfs --daemon start/stop datanode
+                hdfs --daemon start/stop secondarynamenode
+                hdfs --daemon start/stop zkfc
+                hdfs --daemon start/stop journalnode
+            2.启动/停止YARN组件
+                yarn --daemon start/stop resourcemanager
+                yarn --daemon start/stop nodemanager
+            3.启动/停止MAPREDUCE组件
+                mapred --daemon start/stop historyserver
+    8.查看运行日志
+        tail -n500 /opt/module/hadoop-3.3.4/logs/hadoop-atguigu-namenode-hadoop101.log
+        tail -n500 /opt/module/hadoop-3.3.4/logs/hadoop-atguigu-datanode-hadoop101.log
+    9.集群时间同步
+        如果服务器在内网环境，必须要配置集群时间同步，否则时间久了，会产生时间偏差，导致集群执行任务时间不同步
+        1.修改/etc/ntp.conf配置文件
+            sudo vim /etc/ntp.conf
+            1.授权192.168.10.0网段上的所有机器可以从这台机器上查询和同步时间
+                restrict 192.168.10.0 mask 255.255.255.0 nomodify notrap
+            2.集群在局域网中，不使用其他互联网上的时间，将其他时间服务器注释掉
+                #server 0.centos.pool.ntp.org iburst
+                #server 1.centos.pool.ntp.org iburst
+                #server 2.centos.pool.ntp.org iburst
+                #server 3.centos.pool.ntp.org iburst
+            3.当该节点丢失网络连接，依然可以采用本地时间作为时间服务器为集群中的其他节点提供时间同步
+                server 127.127.1.0
+                fudge 127.127.1.0 stratum 10
+        2.修改/etc/sysconfig/ntpd文件
+            SYNC_HWCLOCK=yes
+        3.重启ntpd服务
+            sudo systemctl start ntpd
+        4.设置ntpd服务开机启动
+            sudo systemctl enable ntpd
+        5.关闭集群中所有节点的ntpd服务
+            sudo systemctl stop ntpd
+            sudo systemctl disable ntpd
+        6.其他节点编写同步时间的定时任务
+            sudo crontab -e
+                */1 * * * * sudo /usr/sbin/ntpdate hadoop102
