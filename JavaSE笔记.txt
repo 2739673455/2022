@@ -519,7 +519,9 @@
 					ListIterator迭代器可以从左往右，也可以从右往左
 					在遍历过程中支持对集合进行增、删、改、查
 			6.转换为数组
-				Object[] all = list.toArray()
+				Object[] array = list.toArray()
+			7.转换为List
+				ArrayList<T> list = new ArrayList<>(Arrays.asList(array))
 
 26.栈 Stack LinkedList
 	push(value)  添加元素到栈顶
