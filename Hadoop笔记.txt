@@ -74,7 +74,7 @@
                 echo no argument
                 exit
             fi
-            hosts=(`cat $HOME/bin/hosts.sh`)
+            hosts=(`cat /home/atguigu/bin/hosts.sh`)
             hdfs_host=${hosts[0]}
             yarn_host=${hosts[1]}
             histoty_host=${hosts[0]}
@@ -93,8 +93,8 @@
             function clean(){
                 echo ========== hadoop clean ==========
                 for host in ${hosts[@]};do
-                    ssh $host rm -rf $HADOOP_HOME/data
-                    ssh $host rm -rf $HADOOP_HOME/logs
+                    ssh $host rm -rf $HADOOP_HOME/data        
+                    ssh $host rm -rf $HADOOP_HOME/logs        
                     ssh $host sudo rm -rf /tmp/*
                 done
                 echo ========== clean finish ==========
@@ -108,11 +108,11 @@
             function compare(){
                 echo ========== hadoop compare ==========
                 files=(
-                    /opt/module/hadoop-3.3.4/etc/hadoop/core-site.xml
-                    /opt/module/hadoop-3.3.4/etc/hadoop/hdfs-site.xml
-                    /opt/module/hadoop-3.3.4/etc/hadoop/yarn-site.xml
-                    /opt/module/hadoop-3.3.4/etc/hadoop/mapred-site.xml
-                    /opt/module/hadoop-3.3.4/etc/hadoop/workers
+                    $HADOOP_HOME/etc/hadoop/core-site.xml
+                    $HADOOP_HOME/etc/hadoop/hdfs-site.xml
+                    $HADOOP_HOME/etc/hadoop/yarn-site.xml
+                    $HADOOP_HOME/etc/hadoop/mapred-site.xml
+                    $HADOOP_HOME/etc/hadoop/workers
                 )
                 for file in ${files[@]};do
                     if [ ! -f $file ];then
@@ -120,18 +120,29 @@
                         continue
                     fi
                     for host in ${hosts[@]};do
-                        ssh $host cat $file | diff $file - > /dev/null || echo $file on  $hos    t is different
+                        ssh $host cat $file | diff $file - > /dev/null || echo $file on  $host is different
                     done
                 done
                 echo ========== compare finish ==========
+            }
+            function zk(){
+                echo ========== zookeeper $1 ==========
+                for host in ${hosts[@]};do
+                    echo ========== $host ==========
+                    ssh $host zkServer.sh $1
+                done
             }
             case $1 in
             "start")start;;
             "stop")stop;;
             "clean")clean;;
-            "show")jpsall;;
+            "jps")jpsall;;
             "compare")compare;;
-            *)echo argument error;;
+            "zk")zk $2;;
+            *)
+                echo argument error
+                echo "start|stop|clean|jps|compare|zk" 
+            ;;
             esac
 
     3.集群配置文件
@@ -803,3 +814,351 @@
         3.打jar包的方式
             默认的任务提交都是提交到default队列的。如果希望向其他队列提交任务，需要在Driver中声明
             conf.set("mapreduce.job.queuename","hive")
+
+6.zookeeper
+    1.特点
+        1.Zookeeper：一个领导者(Leader)，多个跟随者(Follower)组成的集群
+        2.集群中只要有半数以上节点存活，Zookeeper集群就能正常服务。所以Zookeeper适合安装奇数台服务器
+        3.全局数据一致：每个Server保存一份相同的数据副本，Client无论连接到哪个Server，数据都是一致的
+        4.更新请求顺序执行，来自同一个Client的更新请求按其发送顺序依次执行
+        5.数据更新原子性，一次数据更新要么成功，要么失败
+        6.实时性，在一定时间范围内，Client能读到最新数据
+    2.集群安装
+        1.解压安装，修改文件名
+            tar -zxvf apache-zookeeper-3.7.1-bin.tar.gz -C /opt/module/
+            mv apache-zookeeper-3.7.1-bin/ zookeeper-3.7.1
+        2.配置服务器编号
+            mkdir /opt/module/zookeeper-3.7.1/zkData
+            vi myid
+            2
+            在文件中添加与server对应的编号(注意：上下不要有空行，左右不要有空格)
+            拷贝配置好的zookeeper到其他机器上,并分别在hadoop103、hadoop104上修改myid文件中内容为3、4
+        3.配置zoo.cfg文件
+            重命名/opt/module/zookeeper-3.7.1/conf这个目录下的zoo_sample.cfg为zoo.cfg
+            mv zoo_sample.cfg zoo.cfg
+            vi zoo.cfg
+            #修改数据存储路径配置
+            dataDir=/opt/module/zookeeper-3.7.1/zkData
+            #增加如下配置
+            #######################cluster##########################
+            server.2=hadoop102:2888:3888
+            server.3=hadoop103:2888:3888
+            server.4=hadoop104:2888:3888
+            #配置参数解读server.第几号服务器=服务器的地址:服务器Follower与集群中的Leader服务器交换信息的端口:执行选举时服务器相互通信的端口
+            同步zoo.cfg文件
+        4.集群操作
+            分别启动ZooKeeper
+            zkServer.sh start
+            查看状态
+            zkServer.sh status
+    3.选举机制
+        SID:服务器ID。用来唯一标识一台ZooKeeper集群中的机器，每台机器不能重复，和myid一致
+        ZXID:事务ID。ZXID是一个事务ID，用来标识一次服务器状态的变更。在某一时刻，集群中的每台机器的ZXID值不一定完全一致，这和ZooKeeper服务器对于客户端“更新请求”的处理逻辑有关
+        Epoch:每个Leader任期的代号。没有Leader时同一轮投票过程中的逻辑时钟值是相同的。每投完一次票这个数据就会增加
+        1.第一次启动
+            1.服务器1启动，发起一次选举。服务器1投自己一票。此时服务器1票数一票，不够半数以上，选举无法完成，服务器1状态保持为LOOKING
+            2.服务器2启动，再发起一次选举。服务器1和2分别投自己一票并交换选票信息：此时服务器1发现服务器2的myid比自己目前投票推举的(服务器1)大，更改选票为推举服务器2。此时服务器1票数0票，服务器2票数2票，没有半数以上结果，选举无法完成，服务器1，2状态保持LOOKING
+            3.服务器3启动，发起一次选举。此时服务器1和2都会更改选票为服务器3。此次投票结果：服务器1为0票，服务器2为0票，服务器3为3票。此时服务器3的票数已经超过半数，服务器3当选Leader。服务器1，2更改状态为FOLLOWING，服务器3更改状态为LEADING
+            4.服务器4启动，发起一次选举。此时服务器1，2，3已经不是LOOKING状态，不会更改选票信息。交换选票信息结果：服务器3为3票，服务器4为1票。此时服务器4服从多数，更改选票信息为服务器3，并更改状态为FOLLOWING
+            5.服务器5启动，同4一样FOLLOWING
+        2.非第一次启动
+            1.当ZooKeeper集群中的一台服务器出现以下两种情况之一时，就会开始进入Leader选举:
+                1.服务器初始化启动
+                2.服务器运行期间无法和Leader保持连接
+            2.而当一台机器进入Leader选举流程时，当前集群也可能会处于以下两种状态:
+                1.集群中本来就已经存在一个Leader
+                    对于第一种已经存在Leader的情况，机器试图去选举Leader时，会被告知当前服务器的Leader信息，对于该机器来说，仅仅需要和Leader机器建立连接，并进行状态同步即可
+                2.集群中确实不存在Leader
+                    假设ZooKeeper由5台服务器组成，SID分别为1、2、3、4、5，ZXID分别为8、8、8、7、7，并且此时SID为3的服务器是Leader。某一时刻，3和5服务器出现故障，因此开始进行Leader选举
+                    选举Leader规则:
+                        1.EPOCH大的直接胜出
+                        2.EPOCH相同，事务id大的胜出
+                        3.事务id相同，服务器id大的胜出
+
+7.hadoop ha 高可用
+    1.概述
+        1.HDFS HA功能通过配置多个NameNodes(Active/Standby)实现在集群中对NameNode的热备来解决上述问题。如果出现故障，如机器崩溃或机器需要升级维护，这时可通过此种方式将NameNode很快的切换到另外一台机器
+        2.怎么保证三台namenode的数据一致
+            1.Fsimage：让一台nn生成数据，让其他机器nn同步
+            2.Edits：需要引进新的模块JournalNode来保证edtis的文件的数据一致性
+        3.怎么让同时只有一台nn是active，其他所有是standby的
+            Zookeeper居中协调，选举active
+        4.2nn在ha架构中并不存在，定期合并fsimage和edtis的活谁来干
+            由standby的nn来干
+        5.如果nn真的发生了问题，怎么让其他的nn上位干活
+            自动故障转移
+    2.HDFS-HA搭建
+        1.在opt目录下创建一个ha文件夹
+            sudo mkdir /opt/ha
+            sudo chown atguigu:atguigu /opt/ha
+        2.将/opt/module/下的 hadoop-3.3.4拷贝到/opt/ha目录下(记得删除 data 和 log 目录)
+            cp -r /opt/module/hadoop-3.3.4 /opt/ha/
+        3.配置core-site.xml
+            <!-- 把多个NameNode的地址组装成一个集群mycluster -->
+            <property>
+                <name>fs.defaultFS</name>
+                <value>hdfs://mycluster</value>
+            </property>
+
+            <!-- 指定hadoop运行时产生文件的存储目录 -->
+            <property>
+                <name>hadoop.tmp.dir</name>
+                <value>/opt/ha/hadoop-3.3.4/data</value>
+            </property>
+            
+            <!-- 指定zkfc要连接的zkServer地址 -->
+            <property>
+                <name>ha.zookeeper.quorum</name>
+                <value>hadoop102:2181,hadoop103:2181,hadoop104:2181</value>
+            </property>
+        4.配置hdfs-site.xml
+            <!-- NameNode数据存储目录 -->
+            <property>
+                <name>dfs.namenode.name.dir</name>
+                <value>file://${hadoop.tmp.dir}/name</value>
+            </property>
+
+            <!-- DataNode数据存储目录 -->
+            <property>
+                <name>dfs.datanode.data.dir</name>
+                <value>file://${hadoop.tmp.dir}/data</value>
+            </property>
+
+            <!-- JournalNode数据存储目录 -->
+            <property>
+                <name>dfs.journalnode.edits.dir</name>
+                <value>${hadoop.tmp.dir}/jn</value>
+            </property>
+
+            <!-- 完全分布式集群名称 -->
+            <property>
+                <name>dfs.nameservices</name>
+                <value>mycluster</value>
+            </property>
+
+            <!-- 集群中NameNode节点都有哪些 -->
+            <property>
+                <name>dfs.ha.namenodes.mycluster</name>
+                <value>nn1,nn2,nn3</value>
+            </property>
+
+            <!-- NameNode的RPC通信地址 -->
+            <property>
+                <name>dfs.namenode.rpc-address.mycluster.nn1</name>
+                <value>hadoop102:8020</value>
+            </property>
+            <property>
+                <name>dfs.namenode.rpc-address.mycluster.nn2</name>
+                <value>hadoop103:8020</value>
+            </property>
+            <property>
+                <name>dfs.namenode.rpc-address.mycluster.nn3</name>
+                <value>hadoop104:8020</value>
+            </property>
+
+            <!-- NameNode的http通信地址 -->
+            <property>
+                <name>dfs.namenode.http-address.mycluster.nn1</name>
+                <value>hadoop102:9870</value>
+            </property>
+            <property>
+                <name>dfs.namenode.http-address.mycluster.nn2</name>
+                <value>hadoop103:9870</value>
+            </property>
+            <property>
+                <name>dfs.namenode.http-address.mycluster.nn3</name>
+                <value>hadoop104:9870</value>
+            </property>
+
+            <!-- 指定NameNode元数据在JournalNode上的存放位置 -->
+            <property>
+                <name>dfs.namenode.shared.edits.dir</name>
+            <value>qjournal://hadoop102:8485;hadoop103:8485;hadoop104:8485/mycluster</value>
+            </property>
+
+            <!-- 访问代理类：client用于确定哪个NameNode为Active -->
+            <property>
+                <name>dfs.client.failover.proxy.provider.mycluster</name>
+                <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
+            </property>
+
+            <!-- 配置隔离机制，即同一时刻只能有一台服务器对外响应 -->
+            <property>
+                <name>dfs.ha.fencing.methods</name>
+                <value>sshfence</value>
+            </property>
+
+            <!-- 使用隔离机制时需要ssh秘钥登录-->
+            <property>
+                <name>dfs.ha.fencing.ssh.private-key-files</name>
+                <value>/home/atguigu/.ssh/id_rsa</value>
+            </property>
+            <!-- 启用nn故障自动转移 -->
+            <property>
+                <name>dfs.ha.automatic-failover.enabled</name>
+                <value>true</value>
+            </property>
+        5.分发配置文件
+    3.启动HDFS-HA集群
+        1.将HADOOP_HOME环境变量更改到HA目录(三台机器)
+            sudo vim /etc/profile.d/my_env.sh
+            export HADOOP_HOME=/opt/ha/hadoop-3.3.4
+            export PATH=$PATH:$HADOOP_HOME/bin
+            export PATH=$PATH:$HADOOP_HOME/sbin
+            去三台机器上source环境变量
+            source /etc/profile
+        2.在各个JournalNode节点上，输入以下命令启动journalnode服务
+            hdfs --daemon start journalnode
+        3.在[nn1]上，对其进行格式化，并启动
+            hdfs namenode -format
+            hdfs --daemon start namenode
+        4.在[nn2]和[nn3]上，同步[nn1]的元数据信息
+            hdfs namenode -bootstrapStandby
+        5.启动[nn2]和[nn3]
+            hdfs --daemon start namenode
+        6.在所有节点上，启动datanode
+            hdfs --daemon start datanode
+        7.格式化zkfc
+            hdfs zkfs -formatZK
+        8.在所有nn节点启动zkfc
+            hdfs --daemon start zkfc
+        9.第二次启动可以通过脚本启动和关闭集群
+            start-dfs.sh
+            stop-dfs.sh
+    4.HA故障恢复
+        HA集群的作用就是当active NN出现故障时，standby NN能快速恢复服务，为我们修理故障争取时间。下面模拟hadoop103节点NN数据出现故障的恢复
+        1.杀掉active的NN(假设在hadoop103)
+            jps
+                21125 DataNode
+                7542 NameNode
+                43340 Jps 
+            kill -9 7542
+        2.删除hadoop103的NN的数据模拟数据出现故障
+            rm -rf /opt/ha/hadoop/data/name
+            此时hadoop103的nn数据已经完全丢失。如果实际生产中数据没有完全损坏，请务必删除干净
+        3.从其他NN恢复数据
+            hdfs namenode -bootstrapStandby
+        4.启动hadoop103的NN
+            hdfs --daemon start namenode
+    5.YARN-HA配置
+        1.yarn-site.xml
+            <property>
+                <name>yarn.nodemanager.aux-services</name>
+                <value>mapreduce_shuffle</value>
+            </property>
+
+            <!-- 启用resourcemanager ha -->
+            <property>
+                <name>yarn.resourcemanager.ha.enabled</name>
+                <value>true</value>
+            </property>
+        
+            <!-- 声明两台resourcemanager的地址 -->
+            <property>
+                <name>yarn.resourcemanager.cluster-id</name>
+                <value>cluster-yarn1</value>
+            </property>
+
+            <!--指定resourcemanager的逻辑列表-->
+            <property>
+                <name>yarn.resourcemanager.ha.rm-ids</name>
+                <value>rm1,rm2,rm3</value>
+            </property>
+        <!-- ========== rm1的配置 ========== -->
+            <!-- 指定rm1的主机名 -->
+            <property>
+                <name>yarn.resourcemanager.hostname.rm1</name>
+                <value>hadoop102</value>
+            </property>
+
+            <!-- 指定rm1的web端地址 -->
+            <property>
+                <name>yarn.resourcemanager.webapp.address.rm1</name>
+                <value>hadoop102:8088</value>
+            </property>
+
+            <!-- 指定rm1的内部通信地址 -->
+            <property>
+                <name>yarn.resourcemanager.address.rm1</name>
+                <value>hadoop102:8032</value>
+            </property>
+
+            <!-- 指定AM向rm1申请资源的地址 -->
+            <property>
+                <name>yarn.resourcemanager.scheduler.address.rm1</name>  
+                <value>hadoop102:8030</value>
+            </property>
+
+            <!-- 指定供NM连接的地址 -->  
+            <property>
+                <name>yarn.resourcemanager.resource-tracker.address.rm1</name>
+                <value>hadoop102:8031</value>
+            </property>
+
+        <!-- ========== rm2的配置 ========== -->
+            <property>
+                <name>yarn.resourcemanager.hostname.rm2</name>
+                <value>hadoop103</value>
+            </property>
+            <property>
+                <name>yarn.resourcemanager.webapp.address.rm2</name>
+                <value>hadoop103:8088</value>
+            </property>
+            <property>
+                <name>yarn.resourcemanager.address.rm2</name>
+                <value>hadoop103:8032</value>
+            </property>
+            <property>
+                <name>yarn.resourcemanager.scheduler.address.rm2</name>
+                <value>hadoop103:8030</value>
+            </property>
+            <property>
+                <name>yarn.resourcemanager.resource-tracker.address.rm2</name>
+                <value>hadoop103:8031</value>
+            </property>
+
+        <!-- ========== rm3的配置 ========== -->
+            <property>
+                <name>yarn.resourcemanager.hostname.rm3</name>
+                <value>hadoop104</value>
+            </property>
+            <property>
+                <name>yarn.resourcemanager.webapp.address.rm3</name>
+                <value>hadoop104:8088</value>
+            </property>
+            <property>
+                <name>yarn.resourcemanager.address.rm3</name>
+                <value>hadoop104:8032</value>
+            </property>
+            <property>
+                <name>yarn.resourcemanager.scheduler.address.rm3</name>  
+                <value>hadoop104:8030</value>
+            </property>
+            <property>
+            <name>yarn.resourcemanager.resource-tracker.address.rm3</name>
+                <value>hadoop104:8031</value>
+            </property>
+            <property>
+                <name>yarn.resourcemanager.zk-address</name>
+                <value>hadoop102:2181,hadoop103:2181,hadoop104:2181</value>
+            </property>
+            <property>
+                <name>yarn.resourcemanager.recovery.enabled</name>
+                <value>true</value>
+            </property>
+            <property>
+                <name>yarn.resourcemanager.store.class</name>     <value>org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore</value>
+            </property>
+            <property>
+                <name>yarn.nodemanager.env-whitelist</name>
+                <value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_MAPRED_HOME</value>
+            </property>
+        2.分发配置文件
+    6.启动YARN
+        1.在hadoop102或者hadoop103中执行
+            start-yarn.sh
+        2.查看服务状态
+            yarn rmadmin -getServiceState rm1
+        3.可以去zkCli.sh客户端查看ResourceManager选举锁节点内容
+            zkCli.sh
+            get -s /yarn-leader-election/cluster-yarn1/ActiveStandbyElectorLock

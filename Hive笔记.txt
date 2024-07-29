@@ -1,0 +1,514 @@
+1.hive简介
+    1.hive本质
+        hive是一个hadoop客户端，用于将HQL(hive SQL)转化成MapReduce程序
+        1.hive中每张表的数据存储在HDFS
+        1.hive分析数据底层的实现是MapReduce(也可配置为Spark或者Tez)
+        1.执行程序运行在Yarn上
+    2.hive安装
+        1.下载hive
+        2.解压
+        3.添加环境变量，source更新环境变量
+        4.初始化元数据库
+            schematool -dbType derby -initSchema
+    3.mysql安装
+        1.下载mysql安装包
+        2.卸载系统自带的mariadb
+            sudo rpm -qa | grep mariadb | xargs sudo rpm -e --nodeps
+        3.安装mysql依赖
+            sudo rpm -ivh mysql-community-common-5.7.28-1.el7.x86_64.rpm
+            sudo rpm -ivh mysql-community-libs-5.7.28-1.el7.x86_64.rpm
+            sudo rpm -ivh mysql-community-libs-compat-5.7.28-1.el7.x86_64.rpm
+        4.安装mysql-client
+            sudo rpm -ivh mysql-community-client-5.7.28-1.el7.x86_64.rpm
+        5.安装mysql-server
+            sudo rpm -ivh mysql-community-server-5.7.28-1.el7.x86_64.rpm
+    4.配置mysql
+        1.启动mysql
+            sudo systemctl start mysqld
+        2.查看mysql密码
+            sudo cat /var/log/mysqld.log | grep password
+        3.进入mysql
+            mysql -uroot -p'password'
+        4.更改密码策略
+            set global validate_password_policy=0
+            set global validate_password_length=4
+        4.设置新密码
+            set password=password('123456')
+        5.进入mysql库
+            use mysql
+        6.查询user表
+            select host,user from user
+        7.修改user表，把host内容修改为%
+            update user set host='%' where user='root'
+        8.刷新
+            flush privileges
+        9.退出
+            quit
+    5.配置元数据到mysql
+        1.新建元数据
+            mysql -uroot -p
+            create database metastore;
+            quit;
+        2.将mysql的JDBC驱动拷贝到hive的lib目录下
+            cp /opt/software/mysql-connector-java-5.1.37.jar $hive_HOME/lib
+        3.在hive目录下新建hive-site.xml文件
+            vim $hive_HOME/conf/hive-site.xml
+            添加如下内容
+            <?xml version="1.0"?>
+            <?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+            <configuration>
+                <!-- jdbc连接的URL -->
+                <property>
+                    <name>javax.jdo.option.ConnectionURL</name>
+                    <value>jdbc:mysql://hadoop102:3306/metastore?useSSL=false</value>
+                </property>
+                
+                <!-- jdbc连接的Driver-->
+                <property>
+                    <name>javax.jdo.option.ConnectionDriverName</name>
+                    <value>com.mysql.jdbc.Driver</value>
+                </property>
+                
+                <!-- jdbc连接的username-->
+                <property>
+                    <name>javax.jdo.option.ConnectionUserName</name>
+                    <value>root</value>
+                </property>
+
+                <!-- jdbc连接的password -->
+                <property>
+                    <name>javax.jdo.option.ConnectionPassword</name>
+                    <value>123456</value>
+                </property>
+
+                <!-- hive默认在HDFS的工作目录 -->
+                <property>
+                    <name>hive.metastore.warehouse.dir</name>
+                    <value>/user/hive/warehouse</value>
+                </property>
+            </configuration>
+        4.初始化hive元数据库(修改为采用MySQL存储元数据)
+            schematool -dbType mysql -initSchema -verbose
+        5.查看mysql中的元数据信息
+            1.登录mysql
+                mysql -uroot -p
+            2.查看元数据库metastore
+                show databases;
+                use metastore;
+                show tables;
+                select * from DBS;  #查看元数据库中存储的库信息
+                select * from TBLS;  #查看元数据库中存储的表信息
+                select * from COLUMNS_V2;  #查看元数据库中存储的表中列相关信息
+    6.hive部署
+        1.hiveserver2服务  #hive的hiveserver2服务的作用是提供jdbc/odbc接口，为用户提供远程访问hive数据的功能
+            1.hadoop端配置  #修改core-site.xml，分发
+                <!--配置所有节点的atguigu用户都可作为代理用户-->
+                <property>
+                    <name>hadoop.proxyuser.atguigu.hosts</name>
+                    <value>*</value>
+                </property>
+
+                <!--配置atguigu用户能够代理的用户组为任意组-->
+                <property>
+                    <name>hadoop.proxyuser.atguigu.groups</name>
+                    <value>*</value>
+                </property>
+
+                <!--配置atguigu用户能够代理的用户为任意用户-->
+                <property>
+                    <name>hadoop.proxyuser.atguigu.users</name>
+                    <value>*</value>
+                </property>
+            2.hive端配置  #在hive-site.xml文件中添加如下配置信息
+                <!-- 指定hiveserver2连接的host -->
+                <property>
+                    <name>hive.server2.thrift.bind.host</name>
+                    <value>hadoop102</value>
+                </property>
+
+                <!-- 指定hiveserver2连接的端口号 -->
+                <property>
+                    <name>hive.server2.thrift.port</name>
+                    <value>10000</value>
+                </property>
+            3.测试
+                1.启动hiveserver2
+                    hive --service hiveserver2
+                2.使用命令行客户端beeline进行远程访问
+                    beeline -u jdbc:hive2://hadoop102:10000 -n atguigu
+        2.metastore服务  #为hive CLI或者hiveserver2提供元数据访问接口，嵌入式模式和独立服务模式
+            1.嵌入式模式 
+                每个hive CLI都需要直接连接元数据库，当hive CLI较多时，数据库压力会比较大
+                每个客户端都需要用户元数据库的读写权限，元数据库的安全得不到很好的保证
+                嵌入式模式下，只需保证hiveserver2和每个hive CLI的配置文件hive-site.xml中包含连接元数据库所需要的以下参数即可：
+                <!-- jdbc连接的URL -->
+                <property>
+                    <name>javax.jdo.option.ConnectionURL</name>
+                    <value>jdbc:mysql://hadoop102:3306/metastore?useSSL=false</value>
+                </property>
+                
+                <!-- jdbc连接的Driver-->
+                <property>
+                    <name>javax.jdo.option.ConnectionDriverName</name>
+                    <value>com.mysql.jdbc.Driver</value>
+                </property>
+                
+                <!-- jdbc连接的username-->
+                <property>
+                    <name>javax.jdo.option.ConnectionUserName</name>
+                    <value>root</value>
+                </property>
+
+                <!-- jdbc连接的password -->
+                <property>
+                    <name>javax.jdo.option.ConnectionPassword</name>
+                    <value>123456</value>
+                </property>
+            2.独立服务模式
+                1.首先，保证metastore服务的配置文件hive-site.xml中包含连接元数据库所需的以下参数：
+                <!-- jdbc连接的URL -->
+                <property>
+                    <name>javax.jdo.option.ConnectionURL</name>
+                    <value>jdbc:mysql://hadoop102:3306/metastore?useSSL=false</value>
+                </property>
+                
+                <!-- jdbc连接的Driver-->
+                <property>
+                    <name>javax.jdo.option.ConnectionDriverName</name>
+                    <value>com.mysql.jdbc.Driver</value>
+                </property>
+                
+                <!-- jdbc连接的username-->
+                <property>
+                    <name>javax.jdo.option.ConnectionUserName</name>
+                    <value>root</value>
+                </property>
+
+                <!-- jdbc连接的password -->
+                <property>
+                    <name>javax.jdo.option.ConnectionPassword</name>
+                    <value>123456</value>
+                </property>
+                2.其次，保证hiveserver2和每个hive CLI的配置文件hive-site.xml中包含访问metastore服务所需的以下参数：
+                <!-- 指定metastore服务的地址 -->
+                <property>
+                    <name>hive.metastore.uris</name>
+                    <value>thrift://hadoop102:9083</value>
+                </property>
+                #注意：主机名需要改为metastore服务所在节点，端口号无需修改，metastore服务的默认端口就是9083
+                3.测试
+                    1.启动metastore
+                        hive --service metastore
+    7.hive常用交互命令
+        hive -e 'sql语句'  #不进入hive的交互窗口执行hql语句
+        hive -f sql文件  #执行脚本中的hql语句
+    8.hive参数配置方式
+        1.在客户端中设置(当前窗口中当次有效)
+            hive > set 参数名=参数值
+        2.在启动客户端时设置参数(当前窗口中当次有效)
+            hive --hiveconf 参数名=参数值
+        3.在配置文件hive-site.xml中配置(永久有效)
+            cd /opt/module/hive/conf
+            vim hive-site.xml
+            <property>
+                <name>mapreduce.job.reduces</name>
+                <value>9</value>
+            </property>
+    9.常见属性配置
+        1.hive客户端显示当前库和表头
+            hive-site.xml
+            <property>
+                <name>hive.cli.print.header</name>
+                <value>true</value>
+            </property>
+            <property>
+                <name>hive.cli.print.current.db</name>
+                <value>true</value>
+            </property>
+        2.hive运行日志路径配置
+            hive的log默认存放在/tmp/atguigu/hive.log目录下(当前用户名下)
+            修改Hive的log存放日志到/opt/module/hive/logs
+            1.修改$HIVE_HOME/conf/hive-log4j2.properties.template文件名称为hive-log4j2.properties
+            2.在hive-log4j2.properties文件中修改log存放位置
+                property.hive.log.dir=/opt/module/hive/logs
+        3.hive的JVM堆内存设置
+            新版本的Hive启动的时候，默认申请的JVM堆内存大小为256M，JVM堆内存申请的太小，导致后期开启本地模式，执行复杂的SQL时经常会报错：java.lang.OutOfMemoryError: Java heap space，因此最好提前调整一下HADOOP_HEAPSIZE这个参数
+            1.修改$HIVE_HOME/conf下的hive-env.sh.template为hive-env.sh
+            2.将hive-env.sh其中的参数 export HADOOP_HEAPSIZE修改为2048，重启Hive
+        4.关闭Hadoop虚拟内存检查
+            yarn-site.xml添加如下配置
+            <property>
+                <name>yarn.nodemanager.vmem-check-enabled</name>
+                <value>false</value>
+            </property>
+        5.开启本地模式
+            set hive.exec.mode.local.auto=true;
+
+2.库操作
+    1.建库语句格式
+        create database [if not exists] 库名
+        [comment 注释]
+        [location hdfs对应路径]  #默认路径为/user/hive/warehouse
+        [with dbproperties('属性名'='属性值',...)]  #给库设置属性
+    2.案例
+        create database d1
+        comment 'this is d1'
+        location '/demo/d1'
+        with dbproperties('ver'='1.0');
+
+        #注意：库名和HDFS上对应的目录名可以不一致（对应关系元数据记录了）
+        create database d2
+        comment 'this is d1'
+        location '/demo/d2222'
+        with dbproperties('ver'='1.0');
+    3.库操作
+        1.查看库的信息
+            desc database [extended] 库名  #[extended]加上后可以查看库的属性
+        2.查询数据库
+            show databases [like '匹配规则']  #like 模糊查询 只能用 * | 匹配
+        3.删除数据库
+            drop database [if exists] 库名 [restrict|cascade]
+            #cascade用来删除非空的库,默认restrict只能删除空库
+        4.切换库
+            use 库名
+        5.修改库
+            1.修改库的属性
+                alter database 库名 set dbproperties('属性名'='属性值',...)
+            2.修改location
+                alter database 库名 set location hdfs绝对路径('hdfs://hadoop102:8020/user...')
+            3.修改owner user
+                alter database 库名 set owner user 用户名
+
+3.表操作
+    1.建表语句格式
+        #temporary  创建临时表，客户端退出删除临时表
+        #external  创建外部表，否则是管理表
+            1.删除管理表时会将元数据和HDFS上的数据全部删除掉
+            删除外部表时只会删除元数据
+            2.truncate table时只能清空管理表。清空外部表时会报错
+        create [temporary] [external] table [if not exists] [库名.]表名
+        [(
+            字段名 字段类型 [comment 字段描述信息，注释]
+            ...
+        )]
+        [comment 表的描述信息，注释]
+        [partitioned by (字段名 字段类型 [comment 字段描述信息，注释],...)]  #创建分区表
+        [clustered by (分桶字段名1,分桶字段名2,...)]  #创建分桶表
+        [row format row_format]  #用来对数据和元数据的匹配进行说明
+            [fields terminated by 分隔字符]  #每个字段用什么分隔
+            [collection items terminated by 分隔字符]  #复杂数据类型中的元素之间用什么分隔
+            [map keys terminated by 分隔字符]  #map中的元素的key和value用什么分隔
+            [lines terminated by 分隔字符]  #每条数据之间用什么分隔
+            [null defined as 字符]  #表中的null值在HDFS上的文件中用什么字符表示，默认\N
+        [stored as file_format]  #数据的存储格式，默认是textfile
+        [location 路径]  #创建库和表在hdfs上对应的路径
+        [tblproperties ('属性名'='属性值',...)]
+    2.案例
+        1.创建表
+            create table if not exists db1.employee(
+            id int comment 'this is id',
+            name string comment 'this is name'
+            )
+            comment 'this is table'
+            location '/demo/employee'
+            tblproperties('ver'='1.0');	
+        2.创建临时表
+            create temporary table tem_tbl(
+            id int,
+            name string
+            );
+        3.将查询的结果创建成一张表
+            create table 表名
+            as
+            select .....
+        4.基于现有的表创建一张新表(没有数据只有表结构)
+            create table 新表的表名 like 存在的表的表名;
+        5.创建表(数据只有value)
+            create table stu(
+            name string,
+            friends array<string>,
+            students map<string,int>,
+            address struct<street:string,city:string,postal_code:int>
+            )
+            row format delimited
+            fields terminated by ','
+            collection items terminated by '-'
+            map keys terminated by ':';
+        6.创建表(数据为json)
+            create table stu2(
+            name string,
+            friends array<string>,
+            students map<string,int>,
+            address struct<street:string,city:string,postal_code:int>
+            )
+            row format serde 'org.apache.hadoop.hive.serde2.JsonSerDe';
+        7.查询复杂数据
+            select 数组[索引],map['key值'],struct.字段名 from 表名;
+        8.创建外部表
+            create external table ext_tbl(
+            id int,
+            name string
+            )
+            row format delimited fields terminated by '\t';
+        9.创建管理表
+            create table man_tbl(
+            id int,
+            name string
+            )
+            row format delimited fields terminated by '\t';
+        10.外部表和管理表的转换
+            desc formatted 表名  #查看表信息
+            alter table 表名 set tblproperties('EXTERNAL'='TRUE/FALSE')  #通过修改表的属性修改表的类型
+    3.表操作
+        1.查看表
+            show tables [in 库名] like ['匹配规则'](可使用 * |)
+        2.查看表信息
+            desc(describe) [ectended | formatted] [库名.]表名
+            #desc 表名  #查看字段信息
+            #desc formatted 表名  #查看表的详细信息
+            #desc ectended 表名  #查看表的详细信息但是显示的内容没有格式化
+        3.修改表名
+            alter table 原表名 rename to 新表名
+        4.对列操作
+            1.添加列
+                alter table 表名 add columns (字段名 字段类型 [comment 注释],...)
+            2.更新列-更新列的名字
+                alter table 表名 change [column] 原字段名 新字段名 字段类型 [comment 注释]
+            3.更新列-更新列的类型
+                alter table 表名 change [column] 字段名 字段名 字段新类型 [commnet 注释]
+                #注意字段的类型是否可以转。比如int可以转string，但string不能转int
+            4.更新列-调字段的位置
+                alter table 表名 change [column] 字段名 字段名 字段新类型 [comment 注释] [first | after 字段名]
+                1.在交换位置时只能交换元数据，数据不会交换
+                2.注意数据类型
+            5.替换列
+                alter table 表名 replace columns (字段名 字段类型 [comment 注释],...)
+                1.替换是依次替换
+                2.替换时一定要注意字段的类型
+                3.如果替换的字段的数量少于原数量，直接缺少该字段
+        5.删除表
+            drop table 表名
+        6.清空表
+            truncate table 表名  #不能清空外部表
+        7.导入导出数据
+            1.load从文件中导入数据
+                load data [local] inpath '文件路径' [overwrite] into table 表名
+                [partiton (partcol1=val1,partcol2=val2,...)];
+                #local 从本地拷贝数据，没有该字段则从hdfs上剪切数据
+                #overwrite 覆盖表中原本数据，没有该字段则追加
+            2.insert导入数据
+                1.从其他表导入
+                    insert into/overwrite table 表名[(字段1,字段2,...)]
+                    [partition (partcol1=val1,partcol2=val2,...)]
+                    select 查询语句;
+                    #into追加  表名后不指定字段则表示插入全字段，查询的字段和被插入的字段的个数和类型要保持一致
+                    #overwrite覆盖  表名后不能写字段名，要求必须全字段，表的字段和查询字段类型要一致
+                2.插入新数据
+                    insert into table 表名(字段名1,字段名2,...)
+                    [partition (partcol1=val1,partcol2=val2,...)]
+                    values(值1,值2),...;
+            3.insert导出数据
+                insert overwrite [local] directory 路径
+                [row format row_format]
+                [stored as 文件格式]
+                select 查询语句;
+            4.export导出数据到hdfs
+                export table 表名 to 'hdfs路径'
+            5.import从hdfs导入数据
+                import [external] table 新表名 from 'hdfs路径' [location 'hdfs绝对路径'('hdfs://hadoop102:8020/...')]
+                #只能导入到不存在的表，只能创建新表
+                #导入的数据只能是通过export导出的数据，因为这个数据中才有元数据
+
+4.表查询
+    1.关系运算符
+        A<=>B  #如果A和B都为null或者都不为null，则返回true，如果只有一边为null，返回false
+        A rlike B, A regexp B  #B是基于java的正则表达式，如果A与其匹配，则返回true；反之返回false
+    2.单行函数
+        show functions  #查看系统内置函数
+        desc function 函数名  #查看内置函数用法
+        desc function extended 函数名  #查看内置函数详细信息
+        1.字符串函数
+            1.正则替换
+                regexp_replace(string A, string B, string C)
+            2.替换null
+                nvl(A,B)
+            3.以指定分隔符拼接字符串或者字符串数组
+                concat_ws(string A, string B,...| array(string))
+            4.解析json字符串
+                get_json_object(string json_string, string path)  #解析json的字符串json_string，返回path指定的内容。如果输入的json字符串无效，那么返回NULL
+                get_json_object('[{"name":"A","age":"25"},{"name":"B","age":"47"}]','$.[0].name');
+        2.日期函数
+            1.unix_timestamp  #返回当前或指定时间的时间戳
+                select unix_timestamp('2022/08/08 08-08-08','yyyy/MM/dd HH-mm-ss');
+            2.from_unixtime  #转化UNIX时间戳（从 1970-01-01 00:00:00 UTC 到指定时间的秒数）到当前时区的时间格式
+                select from_unixtime(1659946088);
+            3.current_date  #当前日期
+            4.current_timestamp  #当前的日期加时间，并且精确到毫秒
+            5.month  #获取日期中的月
+                select month('2022-08-08 08:08:08');
+            6.day  #获取日期中的日
+                select day('2022-08-08 08:08:08');
+            7.hour  #获取日期中的小时
+                select hour('2022-08-08 08:08:08');
+            8.datediff  #两个日期相差的天数(左减右)
+                select datediff('2021-08-08','2022-10-09');
+            9.date_add  #日期增加指定天数
+                select date_add('2022-08-08',2);
+            10.date_sub  #日期减去指定天数
+                select date_sub('2022-08-08',2);
+            11.date_format  #将标准日期解析成指定格式字符串
+                select date_format('2022-08-08','yyyy年-MM月-dd日');
+        3.流程控制函数
+            if  #if(boolean testCondition, T valueTrue, T valueFalseOrNull)
+                select if(10 > 5,true,false);
+        4.集合函数
+            1.array  #array(val1, val2,...) 
+                select array('1','2','3','4');
+            2.array_contains  #判断array中是否包含某个元素
+                select array_contains(array('a','b','c','d'),'a');
+            3.sort_array  #将array中的元素排序
+                select sort_array(array('a','d','c'));
+            4.size  #集合中元素的个数
+                select size(friends) from test;  #每一行数据中的friends集合里的个数
+            5.map  #map (key1, value1, key2, value2,...)
+                select map('jia',1,'yi',2);
+            6.map_keys  #返回map中的key
+                select map_keys(map('jia',1,'yi',2));
+            7.map_values  #返回map中的value
+                select map_values(map('jia',1,'yi',2));
+            8.struct  #声明struct中的各属性  struct(val1, val2, val3,...) 
+                select struct('name','age','weight');
+                输出:{"col1":"name","col2":"age","col3":"weight"}
+            9.named_struct  #声明struct的属性和值
+                select named_struct('name','jia','age',18,'weight',80);
+                输出:{"name":"jia","age":18,"weight":80}
+        5.高级聚合函数
+            1.collect_list  #收集并形成list
+            2.collect_set  #收集并形成set，去重
+    3.高级函数
+        1.炸裂函数
+            1.格式
+                select 表1字段名,字段名2
+                from 表1
+                lateral view explode(xx) 表2 as 字段名2
+            2.案例
+                select name,explode_friends
+                from employee
+                lateral view explode(friends) lv as explode_friends
+        2.窗口函数
+            1.格式
+                over(分区(分组)  排序  范围)
+                # rows between () and ()  #给窗口画范围
+                # unbounded preceding  #上无边界
+                # unbounded following  #下无边界
+                # n preceding  #上n行
+                # n following  #下n行
+                # current row  #当前行
+            2，案例
+                1.select user_name,count(*) over()  #对窗口中的数据进行count
+                    from order_info；
+                2.select
+                        *,
+                        sum(order_amount) over(partition by user_name order by order_date rows between unbounded preceding and current row )
+                    from order_info;
