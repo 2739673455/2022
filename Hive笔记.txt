@@ -360,6 +360,116 @@
         10.外部表和管理表的转换
             desc formatted 表名  #查看表信息
             alter table 表名 set tblproperties('EXTERNAL'='TRUE/FALSE')  #通过修改表的属性修改表的类型
+        11.创建分区表
+            create table dept_partition(
+                deptno int,
+                dname  string,
+                loc    string
+            )
+            partitioned by (day string)  #指定分区字段
+            row format delimited fields terminated by '\t';
+        12.分区表操作
+            1.查看分区
+                show partitions 表名
+            2.添加分区  alter table 表名 add partition(分区字段名='分区值') partition(分区字段名='分区值')...
+                alter table dept_partition add partition(day='20221010')
+                alter table dept_partition add partition(day='20221011') partition(day='20221012')
+            3.删除分区  alter table 表名 drop partition(分区字段名='分区值'),partition(分区字段名='分区值')...
+                alter table dept_partition drop partition(day='20221011'),partition(day='20221012')
+            4.导数据  load data [local] inpath '数据的地址' [overwrite] into table 表名 partition(分区字段名='分区值')
+                load data local inpath '/opt/module/hive/datas/20221010.txt' into table dept_partition partition(day='20221010')
+                #如果导数据时没有对应的分区那么会自动创建
+            5.同步hdfs与元数据分区信息
+                1.增加hdfs路径存在但元数据缺失的分区信息(有目录但是没有对应的元数据)
+                    msck repair table 表名 add partitions
+                2.删除hdfs路径已经删除但元数据仍然存在的分区信息(有元数据但是没有对应的目录)
+                    msck repair table 表名 drop partitions
+                3.该命令会同步hdfs路径和元数据分区信息，相当于同时执行上述的两个命令
+                    msck repair table 表名 sync partitions
+            6.分区表-二级分区
+                1.创建表
+                    create table dept_partition2(
+                        deptno  int,
+                        dname   string,
+                        loc     string
+                    )
+                    partitioned by (day string, hour string)
+                    row format delimited fields terminated by '\t';
+                2.添加分区  alter table 表名 add partition(分区字段名1='值',分区字段名2=‘值’) partition(分区字段名1='值',分区字段名2=‘值’)...
+                3.导数据  load data [local] inpath '数据的地址' [overwrite] into table 表名 partition(分区字段名1='值',分区字段名2=‘值’)
+                    load data local inpath '/opt/module/hive/datas/20221010.txt' into table dept_partition2 partition(day='20221010',hour='01')
+            7.动态分区
+                将非分区表变成分区表 ---> 本身表不能改
+                1.创建分区表
+                    create table dept_partition_dynamic(
+                        id int,
+                        name string
+                    )
+                    partitioned by (loc int)
+                    row format delimited fields terminated by '\t';
+                2.设置成非严格模式
+                    set hive.exec.dynamic.partition.mode=nonstrict;
+                3.只能将查询的结果插入到分区表中
+                    insert into table dept_partition_dynamic
+                    partition(loc)  #指定分区字段
+                    select
+                        deptno,
+                        dname,
+                        loc
+                    from dept;
+        13.分桶表
+            1.创建分桶表
+                create table stu_buck_sort(
+                    id int,
+                    name string
+                )
+                clustered by(id)  #指定分桶字段(会对该字段的值的 hashCode值 % 桶的数量 进行分桶)
+                sorted by (id)  #分桶时对数据进行排序,按照id升序
+                into 4 buckets  #桶的数量(分几个文件)
+                row format delimited fields terminated by '\t';
+            2.向分桶表中导入数据
+                insert / load
+                #向分桶表中导入的数据(load data方式)必须放在HDFS上
+                load data inpath '/demo/datas2/student2.txt' into table stu_buck;
+        14.存储格式
+            1.textfile
+                1.创建表
+                    create table textfile_table
+                    (
+                        id int,
+                        name string
+                    )
+                    row format delimited fields terminated by '\t'
+                    stored as textfile;  #指定存储格式
+                    [set hive.exec.compress.output=true;  #SQL语句的最终输出结果是否压缩
+                    set mapreduce.output.fileoutputformat.compress.codec =org.apache.hadoop.io.compress.SnappyCodec;  #输出结果的压缩格式]
+                2.导入数据
+                    load data local inpath '/opt/module/hive/datas/student2.txt' into table textfile_table;
+            2.orc
+                1.创建表
+                    create table orc_table
+                    (
+                        id int,
+                        name string
+                    )
+                    row format delimited fields terminated by '\t'
+                    stored as orc  #指定存储格式
+                    tblproperties ("orc.compress"="none");  #不开启压缩
+                    / tblproperties ("orc.compress"="snappy");  #开启压缩
+                2.导入数据，只能通过insert
+                    insert into table orc_table select * from textfile_table;
+            3.parquet
+                1.创建表
+                    create table parquet_table
+                    (
+                        id int,
+                        name string
+                    )
+                    row format delimited fields terminated by '\t'
+                    stored as parquet;  #指定存储格式
+                    [tblproperties ("parquet.compression"="snappy");  #开启压缩]
+                2.导入数据，只能通过insert
+                    insert into table parquet_table select * from textfile_table;
     3.表操作
         1.查看表
             show tables [in 库名] like ['匹配规则'](可使用 * |)
@@ -424,7 +534,12 @@
     1.关系运算符
         A<=>B  #如果A和B都为null或者都不为null，则返回true，如果只有一边为null，返回false
         A rlike B, A regexp B  #B是基于java的正则表达式，如果A与其匹配，则返回true；反之返回false
-    2.单行函数
+    2.拼接
+        union  #上下拼接，去重
+        union all  #上下拼接，不去重
+        两个sql的结果，列的个数必须相同
+        两个sql的结果，上下所对应列的类型必须一致
+    3.单行函数
         show functions  #查看系统内置函数
         desc function 函数名  #查看内置函数用法
         desc function extended 函数名  #查看内置函数详细信息
@@ -486,7 +601,7 @@
         5.高级聚合函数
             1.collect_list  #收集并形成list
             2.collect_set  #收集并形成set，去重
-    3.高级函数
+    4.高级函数
         1.炸裂函数
             1.格式
                 select 表1字段名,字段名2
@@ -497,18 +612,46 @@
                 from employee
                 lateral view explode(friends) lv as explode_friends
         2.窗口函数
-            1.格式
+            1.over窗口
                 over(分区(分组)  排序  范围)
-                # rows between () and ()  #给窗口画范围
+                # rows between () and ()  #按行确定范围
+                # range between () and ()  #按值确定范围 按order后的值取
                 # unbounded preceding  #上无边界
                 # unbounded following  #下无边界
                 # n preceding  #上n行
                 # n following  #下n行
                 # current row  #当前行
-            2，案例
                 1.select user_name,count(*) over()  #对窗口中的数据进行count
                     from order_info；
-                2.select
-                        *,
+                2.select *,
                         sum(order_amount) over(partition by user_name order by order_date rows between unbounded preceding and current row )
+                    from order_info;
+            2.取上1行与下1行
+                lag(字段名,n,默认值)  #当前行的前n行的字段值 如果没有用默认值
+                lead(字段名,n,默认值)  #当前行的后n行的字段值 如果没有用默认值
+                注意：不支持自定义窗口范围，只可以写上无边界到下无边界
+                1.select *,
+                        lag(order_amount, 1, 0) over (partition by user_name order by order_date),
+                        lead(order_amount, 1, 0) over (partition by user_name order by order_date)
+                    from order_info
+            3.取第1个与最后1个
+                first_value(字段名,true/false)  #获取窗口中的第一条数据
+                    #true/false  #如果第一条数据为null是否获取null值
+                last_value(字段名,true/false)  #获取窗口中的最后一条数据
+                    #true/false  #如果最后一条数据为null是否获取null值
+                1.select *,
+                        first_value(order_date,false) over(partition by user_name order by order_date
+                            rows between unbounded preceding and unbounded following),
+                        last_value(order_date,false) over(partition by user_name order by order_date
+                            rows between unbounded preceding and unbounded following)
+                    from order_info;
+            4.排名
+                rank()  #排名不一定连续
+                dense_rank()  #排名连续
+                row_number()  #行号
+                注意：不支持自定义窗口
+                1.select *,
+                        rank() over (order by order_amount desc),
+                        dense_rank() over (order by order_amount desc),
+                        row_number() over (order by order_amount desc)
                     from order_info;
