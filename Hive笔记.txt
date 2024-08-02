@@ -655,3 +655,189 @@
                         dense_rank() over (order by order_amount desc),
                         row_number() over (order by order_amount desc)
                     from order_info;
+
+5.hive调优
+    1.Explain执行计划概述
+        explain [ formatted | extended | dependency ]
+        sql语句;
+        # formatted  #将执行计划以JSON字符串的形式输出
+        # extended  #输出执行计划中的额外信息，通常是读写的文件名等信息
+        # dependency  #输出执行计划读取的表及分区
+    2.分组聚合优化
+        # map-side聚合，就是在map端维护一个hash table，利用其完成部分的聚合，然后将部分聚合的结果，按照分组字段分区，发送至reduce端，完成最终的聚合。map-side聚合能有效减少shuffle的数据量，提高分组聚合运算的效率
+        1.set hive.map.aggr=true;
+            #启用map-side聚合
+        2.set hive.map.aggr.hash.min.reduction=0.5;
+            #用于检测源表数据是否适合进行map-side聚合。检测的方法是：先对若干条数据进行map-side聚合，若聚合后的条数和聚合前的条数比值小于该值，则认为该表适合进行map-side聚合；否则，认为该表数据不适合进行map-side聚合，后续数据便不再进行map-side聚合
+        3.set hive.groupby.mapaggr.checkinterval=100000;
+            #用于检测源表是否适合map-side聚合的条数
+        4.set hive.map.aggr.hash.force.flush.memory.threshold=0.9;
+            #map-side聚合所用的hash table，占用map task堆内存的最大比例，若超出该值，则会对hash table进行一次flush
+    3.Join优化
+        1.Common Join
+            Common Join是Hive中最稳定的join算法，其通过一个MapReduce Job完成一个join操作。Map端负责读取join操作所需表的数据，并按照关联字段进行分区，通过Shuffle，将其发送到Reduce端，相同key的数据在Reduce端完成最终的Join操作
+        2.Map Join
+            Map Join算法可以通过两个只有map阶段的Job完成一个join操作。其适用场景为大表join小表。若某join操作满足要求，则第一个Job会读取小表数据，将其制作为hash table，并上传至Hadoop分布式缓存(本质上是上传至HDFS)。第二个Job会先从分布式缓存中读取小表数据，并缓存在Map Task的内存中，然后扫描大表数据，这样在map端即可完成关联操作
+        3.Bucket Map Join
+            Bucket Map Join是对Map Join算法的改进，其打破了Map Join只适用于大表join小表的限制，可用于大表join大表的场景。
+            Bucket Map Join的核心思想是：若能保证参与join的表均为分桶表，且关联字段为分桶字段，且其中一张表的分桶数量是另外一张表分桶数量的整数倍，就能保证参与join的两张表的分桶之间具有明确的关联关系，所以就可以在两表的分桶间进行Map Join操作了。这样一来，第二个Job的Map端就无需再缓存小表的全表数据了，而只需缓存其所需的分桶即可
+        4.Sort Merge Bucket Map Join
+            Sort Merge Bucket Map Join（简称SMB Map Join）基于Bucket Map Join。SMB Map Join要求，参与join的表均为分桶表，且需保证分桶内的数据是有序的，且分桶字段、排序字段和关联字段为相同字段，且其中一张表的分桶数量是另外一张表分桶数量的整数倍。
+            SMB Map Join同Bucket Join一样，同样是利用两表各分桶之间的关联关系，在分桶之间进行join操作，不同的是，分桶之间的join操作的实现原理。Bucket Map Join，两个分桶之间的join实现原理为Hash Join算法；而SMB Map Join，两个分桶之间的join实现原理为Sort Merge Join算法。
+            Hash Join和Sort Merge Join均为关系型数据库中常见的Join实现算法。Hash Join的原理相对简单，就是对参与join的一张表构建hash table，然后扫描另外一张表，然后进行逐行匹配。Sort Merge Join需要在两张按照关联字段排好序的表中进行
+        5.Map Join设置
+            1.set hive.auto.convert.join=true;
+                #启动Map Join自动转换
+            2.set hive.mapjoin.smalltable.filesize=250000;
+                #一个Common Join operator转为Map Join operator的判断条件,若该Common Join相关的表中,存在n-1张表的已知大小总和<=该值,则生成一个Map Join计划,此时可能存在多种n-1张表的组合均满足该条件,则hive会为每种满足条件的组合均生成一个Map Join计划,同时还会保留原有的Common Join计划作为后备(back up)计划,实际运行时,优先执行Map Join计划，若不能执行成功，则启动Common Join后备计划
+            3.set hive.auto.convert.join.noconditionaltask=true;
+                #开启无条件转Map Join
+            4.set hive.auto.convert.join.noconditionaltask.size=10000000;
+                #无条件转Map Join时的小表之和阈值,若一个Common Join operator相关的表中，存在n-1张表的大小总和<=该值,此时hive便不会再为每种n-1张表的组合均生成Map Join计划,同时也不会保留Common Join作为后备计划。而是只生成一个最优的Map Join计划
+        6.Bucket Map Join设置
+            1.Hint提示
+                select /*+ mapjoin(ta) */
+                    ta.id,
+                    tb.id
+                from table_a ta
+                join table_b tb on ta.id=tb.id;
+            2.set hive.cbo.enable=false;
+                #关闭cbo优化，cbo会导致hint信息被忽略
+            3.set hive.ignore.mapjoin.hint=false;
+                #map join hint默认会被忽略(因为已经过时)，需将如下参数设置为false
+            4.set hive.optimize.bucketmapjoin = true;
+                #-启用bucket map join优化功能
+        7.Sort Merge Bucket Map Join设置
+            1.set hive.optimize.bucketmapjoin.sortedmerge=true;
+                #启动Sort Merge Bucket Map Join优化
+            2.set hive.auto.convert.sortmerge.join=true;
+                #使用自动转换SMB Join
+    4.数据倾斜
+        1.分组聚合导致的数据倾斜
+            1.Map-Side聚合
+                # 开启Map-Side聚合后，数据会现在Map端完成部分聚合工作。这样一来即便原始数据是倾斜的，经过Map端的初步聚合后，发往Reduce的数据也就不再倾斜了。最佳状态下，Map-端聚合能完全屏蔽数据倾斜问题
+                1.set hive.map.aggr=true;
+                    #启用map-side聚合
+                2.set hive.map.aggr.hash.min.reduction=0.5;
+                    #用于检测源表数据是否适合进行map-side聚合。检测的方法是：先对若干条数据进行map-side聚合，若聚合后的条数和聚合前的条数比值小于该值，则认为该表适合进行map-side聚合；否则，认为该表数据不适合进行map-side聚合，后续数据便不再进行map-side聚合
+                3.set hive.groupby.mapaggr.checkinterval=100000;
+                    #用于检测源表是否适合map-side聚合的条数
+                4.set hive.map.aggr.hash.force.flush.memory.threshold=0.9;
+                    #map-side聚合所用的hash table，占用map task堆内存的最大比例，若超出该值，则会对hash table进行一次flush
+            2.Skew-GroupBy优化
+                # Skew-GroupBy的原理是启动两个MR任务，第一个MR按照随机数分区，将数据分散发送到Reduce，完成部分聚合，第二个MR按照分组字段分区，完成最终聚合
+                1.set hive.groupby.skewindata=true;
+                    #启用skew-groupby
+                2.set hive.map.aggr=false;
+                    #关闭map-side聚合
+        2.Join导致的数据倾斜
+            1.Map Join
+                #使用map join算法，join操作仅在map端就能完成，没有shuffle操作，没有reduce阶段，自然不会产生reduce端的数据倾斜。该方案适用于大表join小表时发生数据倾斜的场景
+                1.set hive.auto.convert.join=true;
+                    #启动Map Join自动转换
+                2.set hive.mapjoin.smalltable.filesize=250000;
+                    #一个Common Join operator转为Map Join operator的判断条件,若该Common Join相关的表中,存在n-1张表的大小总和<=该值,则生成一个Map Join计划,此时可能存在多种n-1张表的组合均满足该条件,则hive会为每种满足条件的组合均生成一个Map Join计划,同时还会保留原有的Common Join计划作为后备(back up)计划,实际运行时,优先执行Map Join计划，若不能执行成功，则启动Common Join后备计划
+                3.set hive.auto.convert.join.noconditionaltask=true;
+                    #开启无条件转Map Join
+                4.set hive.auto.convert.join.noconditionaltask.size=10000000;
+                    #无条件转Map Join时的小表之和阈值,若一个Common Join operator相关的表中，存在n-1张表的大小总和<=该值,此时hive便不会再为每种n-1张表的组合均生成Map Join计划,同时也不会保留Common Join作为后备计划。而是只生成一个最优的Map Join计划
+            2.Skew Join
+                #skew join的原理是，为倾斜的大key单独启动一个map join任务进行计算，其余key进行正常的common join
+                1.set hive.optimize.skewjoin=true;
+                    #启用skew join优化
+                2.set hive.skewjoin.key=100000;
+                    #触发skew join的阈值，若某个key的行数超过该参数值，则触发
+            3.调整SQL语句
+                select *
+                from(
+                    select  #打散操作
+                        concat(id,'_',cast(rand()*2 as int)) id,
+                        value
+                    from A) ta
+                join(
+                    select  #扩容操作
+                        concat(id,'_',0) id,
+                        value
+                    from B
+                    union all
+                    select
+                        concat(id,'_',1) id,
+                        value
+                    from B) tb
+                on ta.id=tb.id;
+    5.任务并行度
+        1.Map端并行度
+            # Map端的并行度，也就是Map的个数。是由输入文件的切片数决定的。一般情况下，Map端的并行度无需手动调整
+            # 以下特殊情况可考虑调整map端并行度：
+            1.查询的表中存在大量小文件
+                按照Hadoop默认的切片策略，一个小文件会单独启动一个map task负责计算。若查询的表中存在大量小文件，则会启动大量map task，造成计算资源的浪费。这种情况下，可以使用Hive提供的CombineHiveInputFormat，多个小文件合并为一个切片，从而控制map task个数
+                set hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
+                    #使用Hive提供的CombineHiveInputFormat
+            2.map端有复杂的查询逻辑
+                若SQL语句中有正则替换、json解析等复杂耗时的查询逻辑时，map端的计算会相对慢一些。若想加快计算速度，在计算资源充足的情况下，可考虑增大map端的并行度，令map task多一些，每个map task计算的数据少一些
+                set mapreduce.input.fileinputformat.split.maxsize=256000000;
+                    #一个切片的最大值
+        2.Reduce端并行度
+            # Reduce端的并行度，也就是Reduce个数。相对来说，更需要关注。Reduce端的并行度，可由用户自己指定，也可由Hive自行根据该MR Job输入的文件大小进行估算
+            # Hive自行估算Reduce并行度时，是以整个MR Job输入的文件大小作为依据的。因此，在某些情况下其估计的并行度很可能并不准确，此时就需要用户根据实际情况来指定Reduce并行度了
+            # Reduce端的并行度的相关参数如下：
+            1.指定Reduce端并行度，默认值为-1，表示用户未指定
+                set mapreduce.job.reduces;
+            2.Reduce端并行度最大值
+                set hive.exec.reducers.max;
+            3.单个Reduce Task计算的数据量，用于估算Reduce并行度
+                set hive.exec.reducers.bytes.per.reducer;
+    6.小文件合并
+        1.Map端输入文件合并
+            # 合并Map端输入的小文件，是指将多个小文件划分到一个切片中，进而由一个Map Task去处理。目的是防止为单个小文件启动一个Map Task，浪费计算资源
+            # 相关参数为：
+            1.可将多个小文件切片，合并为一个切片，进而由一个map任务处理
+                set hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat; 
+        2. Reduce输出文件合并
+            # 合并Reduce端输出的小文件，是指将多个小文件合并成大文件。目的是减少HDFS小文件数量。其原理是根据计算任务输出文件的平均大小进行判断，若符合条件，则单独启动一个额外的任务进行合并
+            # 相关参数为：
+            1.开启合并map only任务输出的小文件
+                set hive.merge.mapfiles=true;
+            2.开启合并map reduce任务输出的小文件
+                set hive.merge.mapredfiles=true;
+            3.合并后的文件大小
+                set hive.merge.size.per.task=256000000;
+            4.触发小文件合并任务的阈值，若某计算任务输出的文件平均大小低于该值，则触发合并
+                set hive.merge.smallfiles.avgsize=16000000;
+    7.其他
+        1.CBO优化
+            # CBO是指Cost based Optimizer，即基于计算成本的优化
+            # 目前CBO在hive的MR引擎下主要用于join的优化，例如多表join的join顺序
+            set hive.cbo.enable=true;
+        2.谓词下推
+            # 谓词下推（predicate pushdown）是指，尽量将过滤操作前移，以减少后续计算步骤的数据量
+            set hive.optimize.ppd = true;
+        3.矢量化查询
+            set hive.vectorized.execution.enabled=true;
+        4.Fetch抓取
+            # Fetch抓取是指，Hive中对某些情况的查询可以不必使用MapReduce计算。例如：select * from emp;在这种情况下，Hive可以简单地读取emp对应的存储目录下的文件，然后输出查询结果到控制台
+            set hive.fetch.task.conversion=more;
+            # 是否在特定场景转换为fetch 任务
+            # none 表示不转换
+            # minimal 表示支持select *，分区字段过滤，Limit等
+            # more 表示支持select 任意字段,包括函数，过滤，和limit等
+        5.本地模式
+            1.开启自动转换为本地模式
+            set hive.exec.mode.local.auto=true;  
+            2.设置local MapReduce的最大输入数据量，当输入数据量小于这个值时采用local  MapReduce的方式，默认为134217728，即128M
+            set hive.exec.mode.local.auto.inputbytes.max=50000000;
+            3.设置local MapReduce的最大输入文件个数，当输入文件个数小于这个值时采用local MapReduce的方式，默认为4
+            set hive.exec.mode.local.auto.input.files.max=10;
+        6.并行执行
+            # Hive会将一个SQL语句转化成一个或者多个Stage，每个Stage对应一个MR Job。默认情况下，Hive同时只会执行一个Stage。但是某SQL语句可能会包含多个Stage，但这多个Stage可能并非完全互相依赖，也就是说有些Stage是可以并行执行的
+            1.启用并行执行优化
+                set hive.exec.parallel=true;       
+            2.同一个sql允许最大并行度，默认为8
+                set hive.exec.parallel.thread.number=8; 
+        7.严格模式
+            1.分区表不使用分区过滤
+                将hive.strict.checks.no.partition.filter设置为true时，对于分区表，除非where语句中含有分区字段过滤条件来限制范围，否则不允许执行。换句话说，就是用户不允许扫描所有分区。进行这个限制的原因是，通常分区表都拥有非常大的数据集，而且数据增加迅速。没有进行分区限制的查询可能会消耗令人不可接受的巨大资源来处理这个表
+            2.使用order by没有limit过滤
+                将hive.strict.checks.orderby.no.limit设置为true时，对于使用了order by语句的查询，要求必须使用limit语句。因为order by为了执行排序过程会将所有的结果数据分发到同一个Reduce中进行处理，强制要求用户增加这个limit语句可以防止Reduce额外执行很长一段时间(开启了limit可以在数据进入到Reduce之前就减少一部分数据)
+            3.笛卡尔积
+                将hive.strict.checks.cartesian.product设置为true时，会限制笛卡尔积的查询。对关系型数据库非常了解的用户可能期望在执行JOIN查询的时候不使用ON语句而是使用where语句，这样关系数据库的执行优化器就可以高效地将WHERE语句转化成那个ON语句。不幸的是，Hive并不会执行这种优化，因此，如果表足够大，那么这个查询就会出现不可控的情况
