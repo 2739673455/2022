@@ -1,0 +1,247 @@
+1.kafka概述
+	1.传统消息队列的应用场景
+		1.缓冲/消峰
+			有助于控制和优化数据流经过系统的速度，解决生产消息和消费消息的处理速度不一致的情况
+		2.解耦
+			允许独立的扩展或修改两边的处理过程，只要确保它们遵守同样的接口约束
+		3.异步通信
+			允许用户把一个消息放入队列，但并不立即处理它，然后在需要的时候再去处理它们
+	2.消息队列的两种模式
+		1.点对点模式
+			消费者主动拉取数据，消息收到之后清楚消息
+		2.发布/订阅模式
+			可以有多个topic主题(浏览、点赞、收藏、评论等)
+			消费者消费数据后，不删除数据
+			每个消费者相互独立，都可以消费到数据
+	3.kafka基础架构
+		- Producer
+			消息生产者，就是向Kafka broker发消息的客户端
+		- Consumer
+			消息消费者，从Kafka broker取消息的客户端
+		- Consumer Group(CG)
+			消费者组，由多个consumer组成，消费者组内每个消费者负责消费不同分区的数据，一个分区只能由一个组内消费者消费，消费者组之间互不影响，所有的消费者都属于某个消费者组，即消费者组是逻辑上的一个订阅者
+		- Broke
+			一台Kafka服务器就是一个broker，一个集群由多个broker组成，一个broker可以容纳多个topic
+		- Topic
+			可以理解为一个队列，生产者和消费者面向的都是一个topic
+		- Partition
+			为了实现扩展性，一个非常大的topic可以分布到多个broker(即服务器)上，一个topic可以分为多个partition，每个partition是一个有序的队列
+		- Replica
+			副本，一个topic的每个分区都有若干个副本，一个Leader和若干个Follower
+		- Leader
+			每个分区多个副本的“主”，生产者发送数据的对象，以及消费者消费数据的对象都是Leader
+		- Follower
+			每个分区多个副本中的“从”，实时从Leader中同步数据，保持和Leader数据的同步，Leader发生故障时，某个Follower会成为新的Leader
+
+2.kafka入门
+	1.安装部署
+		1.修改配置文件  /opt/module/kafka_2.12-3.6.1/config/server.properties
+			- broker.id=0
+				broker的全局唯一编号，不能重复，只能是数字
+			- log.dirs=/opt/module/kafka/datas
+				kafka运行日志(数据)存放的路径，路径不需要提前创建，kafka自动帮你创建，可以配置多个磁盘路径，路径与路径之间可以用","分隔
+			- zookeeper.connect=hadoop102:2181,hadoop103:2181,hadoop104:2181/kafka
+				配置连接Zookeeper集群地址(在zk根目录下创建/kafka，方便管理)
+		2.启动与关闭
+			1.启动
+				kafka-server-start.sh -daemon $KAFKA_HOME/config/server.properties
+				先启动Zookeeper集群，然后启动Kafka
+			2.关闭
+				kafka-server-stop.sh
+				停止Kafka集群时，一定要等Kafka所有节点进程全部停止后再停止Zookeeper集群，因为Zookeeper集群当中记录着Kafka集群相关信息，Zookeeper集群一旦先停止，Kafka集群就没有办法再获取停止进程的信息，只能手动杀死Kafka进程了
+	2.命令行操作
+		1.主题命令行操作
+			- kafka-topics.sh  #查看操作主题命令参数
+			- --bootstrap-server hadoop102:9092  #连接的Kafka Broker主机名称和端口号
+			- --topic 主题名  #操作的topic名称
+			- --create  #创建主题
+			- --delete  #删除主题
+			- --alter  #修改主题
+			- --list  #查看所有主题
+			- --describe  #查看主题详细描述
+			- --partitions 分区数  #设置分区数
+			- --replication-factor 副本数  #设置分区副本
+			- --config <String:name=value>  #更新系统默认的配置
+		2.生产者命令行操作
+			- kafka-console-producer.sh  #查看操作生产者命令参数
+			- --bootstrap-server hadoop102:9092  #连接的Kafka Broker主机名称和端口号
+			- --topic 主题名  #操作的topic名称
+		3.消费者命令行操作
+			- kafka-console-consumer.sh  #查看操作消费者命令参数
+			- --bootstrap-server hadoop102:9092  #连接的Kafka Broker主机名称和端口号
+			- --topic 主题名  #操作的topic名称
+			- --from-beginning  #从头开始消费
+			- --group 消费者组名称  #指定消费者组名称
+
+3.生产者
+	1.生产者消息发送流程
+		在消息发送的过程中，涉及到了两个线程，main线程和Sender线程，在main线程中创建双端队列RecordAccumulator，main线程将消息发送给RecordAccumulator，Sender线程不断从RecordAccumulator中拉取消息发送到Kafka Broker
+		1. 生产者生成消息后先经过拦截器Interceptors
+		2. 经过序列化器Serializer，根据key和value的序列化配置对消息内容序列化
+		3. 经过分区器Partitioner，根据分区进入相应RecordAccumulator队列(默认大小32m)
+		4. 当到达batch.size大小(默认16k)，或到达linger.ms时间(默认0ms)，sender读取数据加入请求队列
+		5. 多少个broker有leader，则有多少组请求队列，每个请求队列最多缓存5个请求
+		6. sender向各个broker发送数据
+		7. broker根据acks进行应答
+			acks=0:生产者发送来的数据，不需要等数据落盘就应答\nacks=1:生产者发送来的数据，leader收到数据后应答\nacks=-1(all):生产者发送来的数据，leader和isr队列中所有节点收齐数据后应答
+		8. broker的应答返回selector，如果失败则重试，如果成功则清理发送过的数据
+	2.生产者重要参数
+		- bootstrap.servers
+			生产者连接集群所需的broker地址清单，例如hadoop102:9092,hadoop103:9092,hadoop104:9092，可以设置1个或者多个，中间用逗号隔开，注意这里并非需要所有的broker地址，因为生产者从给定的broker里查找到其他broker信息
+		- key.serializer和value.serializer
+			指定发送消息的key和value的序列化类型，一定要写全类名
+		- buffer.memory
+			RecordAccumulator缓冲区总大小，默认32m
+		- batch.size
+			缓冲区一批数据最大值，默认16k，适当增加该值，可以提高吞吐量，但是如果该值设置太大，会导致数据传输延迟增加
+		- linger.ms
+			如果数据迟迟未达到batch.size，sender等待linger.time之后就会发送数据，单位ms，默认值是0ms，表示没有延迟，生产环境建议该值大小为50-100ms之间
+		- acks
+			0:生产者发送过来的数据，不需要等数据落盘应答， 1:生产者发送过来的数据，Leader收到数据后应答， -1(all):生产者发送过来的数据，Leader+和isr队列里面的所有节点收齐数据后应答，默认值是-1，-1和all是等价的
+		- max.in.flight.requests.per.connection
+			允许最多没有返回ack的次数，默认为5，开启幂等性要保证该值是 1-5的数字
+		- retries
+			当消息发送出现错误的时候，系统会重发消息，retries表示重试次数，默认是int最大值，2147483647，如果设置了重试，还想保证消息的有序性，需要设置MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION=1否则在重试此失败消息的时候，其他的消息可能发送成功了
+		- retry.backoff.ms
+			两次重试之间的时间间隔，默认是100ms
+		- enable.idempotence
+			是否开启幂等性，默认true，开启幂等性
+		- compression.type
+			生产者发送的所有数据的压缩方式，默认是none，也就是不压缩，支持压缩类型:none、gzip、snappy、lz4和zstd
+	3.生产者分区
+		1.分区的好处
+			1. 便于合理使用存储资源:将海量数据按分区切割存储在多台broker上，实现负载均衡
+			2. 提高并行度:生产者可以以分区为单位发送数据，消费者可以以分区为单位消费数据
+		2.分区策略
+			1. 指明partition
+			2. 没指明partition但有key，将key的hash值与topic的partition数取余得到partition值
+			3. 既没指明partition又没有key，使用Sticky Partition(黏性分区器)随机选择一个分区，并尽可能一直使用该分区，待该分区的batch已满或者已完成，在随机一个和前一次不同的分区
+			4. 自定义分区器，实现Partition接口，重写partition()方法
+	4.生产经验
+		1.提高吞吐量
+			1. batch.size增加批次大小
+			2. linger.ms延长等待时间
+			3. compression.type压缩文件
+			4. RecordAccumulator增加缓冲区大小
+		2.数据可靠性
+			1. 数据完全可靠条件:ack级别设置为-1，分区副本数>=2，isr里应答的最小副本数量>=2
+		3.数据去重
+			1. 幂等性:具有<PID,Partition,SeqNumber>相同的主键消息提交时，broker只会持久化一条
+				PID是kafka每次重启就会分配一个新的
+				Partition表示分区号
+				Sequence Number是单调自增的
+				所以幂等性只能保证在单分区单会话内不重复
+				enable.idempotence 默认为true，开启幂等性
+			2. 生产者事务
+				注意:提前开启幂等性
+				#0.11版本的Kafka同时引入了事务的特性，为了实现跨分区跨会话的事务，需要引入一个全局唯一的Transaction ID，并将Producer获得的PID和Transaction ID绑定，这样当Producer重启后就可以通过正在进行的Transaction ID获得原来的PID
+				为了管理Transaction，Kafka引入了一个新的组件Transaction Coordinator，Producer就是通过和Transaction Coordinator交互获得Transaction ID对应的任务状态，Transaction Coordinator还负责将事务所有写入Kafka的一个内部Topic，这样即使整个服务重启，由于事务状态得到保存，进行中的事务状态可以得到恢复，从而继续进行
+		4.数据有序
+			1. kafka最多只保证单分区内的消息是有序的，所以如果要保证业务全局严格有序，就要设置topic为单分区
+			2. 如何保证单分区内数据有序
+				1. 禁止重试，设置retries=0，会导致丢失数据
+				2. 启用幂等性，设置以下参数
+					enable.idempotence=true
+					max.in.flight.requests.per.connection<=5
+					retries>0
+					acks=-1
+					当此批次的SeqNumber比最新的SeqNumber大2，证明乱序，拒绝写入，回应Producer，对RecorderAccumulator中的分区的batch重新排序
+
+4.Broker
+	1.Broker工作流程
+		1.Zookeeper中存储的Kafka信息
+			admin
+			brokers
+				ids  #[0,1,2] 记录有哪些服务器
+				topics
+					first  #主题名
+						partitions  #分区
+							0  #分区号
+								state  #{"leader":1,"isr":[1,0,2]} 记录谁是leader，有哪些服务器可用
+				seqid
+			cluster
+				id
+			consumers  #0.9版本之前保存offset信息，0.9之后offset存储在kafka主题中
+			controller
+			config
+		2.leader选举流程
+			1. broker启动后在zookeeper中注册
+			2. broker中的controller先在zookeeper中的controller节点注册的进行leader选举决策
+			3. controller监听zookeeper中brokers节点变化
+			4. controller在ar中按顺序轮询，如果在isr中存活，则选为leader
+			5. controller将选举结果写入zookeeper的/brokers/topic/主题名/partitions/0/state中
+			6. 其他controller从zookeeper中读取选举结果
+			7. 如果leader挂了，zookeeper会反向通知controller
+			8. controller获取isr，重新选举leader，并在zookeeper节点中更新leader和isr
+		3.重要参数
+			- replica.lag.time.max.ms
+				默认30s，follower长时间未向leader发送通信请求或同步数据，则该follwer将被踢出isr
+			- auto.leader.rebalance.enable
+				默认true，自动leader partition平衡
+			- leader.imbalance.per.broker.percentage
+				默认10%，每个broker允许的不平衡的leader比率，如果每个broker超过该值，控制器会触发leader的平衡
+			- leader.imbalance.check.interval.seconds
+				默认300s，检查leader负载是否平衡的间隔时间
+			- log.segment.bytes
+				默认1G，kafka中log日志分块存储，指定log日志划分成块的大小
+			- log.index.interval.bytes
+				默认4kb，kafka里面每当写入4kb大小的日志，就往index文件里记录一个索引
+			- log.retention.hours
+				默认7天，kafka中数据保存的时间
+			- log.retention.minutes
+				默认关闭，kafka中数据保存的时间，分钟级别
+			- log.retention.ms
+				默认关闭，kafka中数据保存的时间，毫秒级别
+			- log.retention.check.interval.ms
+				默认5分钟，检查数据是否保存超时的间隔
+			- log.retention.bytes
+				默认-1，表示无穷大，若超过设置的所有日志总大小，删除最早的segment
+			- log.cleanup.policy
+				默认delete，表示所有数据启用删除策略，如果设置值为compact，表示所有数据启用压缩策略
+			- num.io.threads
+				默认8，负责写磁盘的线程数，整个参数值要占总核数的50%
+			- num.replica.fetchers
+				副本拉取线程数，这个参数占总核数的50%的1/3
+			- num.network.threads
+				默认3，数据传输线程数，这个参数占总核数的50%的2/3
+			- log.flush.interval.messages
+				默认long的最大值，9223372036854775807，强制页缓存刷写到磁盘的条数，一般不建议修改，交给系统自己管理
+			- log.flush.interval.ms
+				默认null，每隔多久，刷数据到磁盘，一般不建议修改，交给系统自己管理
+	2.副本
+		1.副本基本信息
+			1. 副本作用:提高数据可靠性
+			2. 默认副本:生产环境一般配置2个，保证数据可靠性，太多副本会增加磁盘存储空间，增加网络上数据传输，降低效率
+			3. kafka中副本分为leader和follower，kafka生产者只会把数据发往leader，然后follower找leader同步数据
+			4. Kafka分区中的所有副本统称为AR(Assigned Repllicas)，AR=ISR+OSR
+				ISR，表示和leader保持同步的follower集合
+				OSR，表示follower与leader副本同步时，延迟过多的副本
+		2.Follower故障处理细节
+			LEO(log end offset):每个副本的最后一个offset，LEO其实就是最新的offset+1
+			HW(high watermark):所有副本中最小的LEO
+			1. follower发生故障后会被临时踢出isr
+			2. 这期间leader和follower继续接受数据
+			3. 待故障的follower恢复后，读取本地磁盘记录的上次的HW，将log文件高于HW的部分截取掉，从HW开始向leader进行同步
+			4. 等待该follower的LEO>=该Partition的HW，即follower追上leader之后，就可以重新加入isr
+		3.Leader故障处理细节
+			1. leader发生故障后，会从isr中选出新的leader
+			2. 为保证多个副本之间的数据一致性，其余的follower会先将各自的log文件高于HW的部分截掉，然后从新的leader同步数据
+			注意:这只能保证副本之间的数据一致性，并不能保证数据不丢失或者不重复
+	3.文件存储
+		1.文件存储机制
+			1.topic数据的存储机制
+				1. 每个partition对应与一个log文件，该log文件中存储的就是Producer生产的数据
+				2. Producer生产的数据会不断被追加到该log文件末端，为防止log文件过大导致数据定位效率低下，kafka采取分片和索引机制，将每个partition分为多个segment
+				3. 每个segment包括.index文件、.log文件、.timeindex文件等，这些文件位于一个文件夹下，该文件夹的命名规则为:topic名-分区序号，如:first-0
+			2.查看数据
+				kafka-run-class.sh kafka.tools.DumpLogSegments --files 文件名
+				kafka-run-class.sh kafka.tools.DumpLogSegments --print-data-log --files 文件名
+			3.index和log文件详解
+				如何在log文件中定位到指定offset的Record:
+				1. 根据目标offset定位Segment文件
+				2. 找到<=目标offset的最大offset对应的索引项
+				3. 定位到log文件
+				4. 向下遍历找到目标Record
+				注意:
+				1. index为稀疏索引，大约每向log文件中写入4kb数据，就会向index文件写入一条索引
+				2. index文件中保存的offset为相对值，以确保offset的值所占空间不会太大
